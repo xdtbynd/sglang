@@ -16,7 +16,8 @@ register_npu_ci(est_time=400, suite="nightly-4-npu-a3", nightly=True)
 
 class TestL2Cache(CustomTestCase):
 
-    def test_L2_cache_05(self):
+    def test_L2_cache_TTFT(self):
+        """After enabling L1L2 cache,the TTFT improved by 40% compared to when it was not enabled"""
         TTFTS = []
         model = "/root/.cache/modelscope/hub/models/Qwen/Qwen3-32B"
         base_url = DEFAULT_URL_FOR_TEST
