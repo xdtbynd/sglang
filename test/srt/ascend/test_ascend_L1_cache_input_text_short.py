@@ -40,7 +40,8 @@ class TestL1Cache(CustomTestCase):
     def tearDownClass(cls):
         kill_process_tree(cls.process.pid)
 
-    def test_L1_cache_03(self):
+    def test_L1_cache_input_text_short(self):
+        
         texts = ["who am i?", "who am i?"]
         for text in texts:
             response = requests.post(
