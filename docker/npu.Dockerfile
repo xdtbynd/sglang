@@ -85,6 +85,7 @@ RUN (${PIP_INSTALL} pybind11 triton-ascend)
 
 # Install SGLang
 RUN git clone https://github.com/sgl-project/sglang.git --branch $SGLANG_TAG && \
+    cd sglang && \
     git reset --hard 1edc69be085473f27314f885e43ab7e70ef09a23 && \
     (cd sglang/python && rm -rf pyproject.toml && mv pyproject_npu.toml pyproject.toml && ${PIP_INSTALL} -v .[all_npu]) && \
     rm -rf sglang
