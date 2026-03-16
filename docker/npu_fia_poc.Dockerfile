@@ -106,7 +106,7 @@ RUN if [ "$DEVICE_TYPE" = "a3" ]; then \
         && tar -zxf so.tar.gz \
         && cp -rf fia/fused_infer_attention_score/* /usr/local/Ascend/ascend-toolkit/latest/opp/built-in/op_impl/ai_core/tbe/kernel/ascend910_93/ops_transformer/fused_infer_attention_score/ \
         && cp -rf so/* /usr/local/Ascend/ascend-toolkit/latest/opp/built-in/op_impl/ai_core/tbe/op_tiling/lib/linux/aarch64/ \
-        && rm -rf fia && rm -rf fia.tar.gz && rm -rf so && rm -rf so.tar.gz \
+        && rm -rf fia && rm -rf fia.tar.gz && rm -rf so && rm -rf so.tar.gz; \
     fi
 
 
