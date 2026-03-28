@@ -352,11 +352,19 @@ class SuffixCacheAdapter:
         filtered_parents = []
         
         # Track recent tokens to detect repetition
-        recent_tokens = context_tokens[-10:]  # Last 10 tokens from context
+        recent_tokens = context_tokens[-15:]  # Last 15 tokens from context for better context awareness
+        
+        # Track token frequency in current context
+        token_freq = {}
+        for token in recent_tokens:
+            token_freq[token] = token_freq.get(token, 0) + 1
         
         # Maximum allowed consecutive duplicates
         MAX_CONSECUTIVE_DUP = 2
         consecutive_counts = {}
+        
+        # Track sequences to detect repeated patterns
+        sequence_history = []
         
         for i, (token, parent) in enumerate(zip(token_ids, parents)):
             # Check consecutive duplicates
@@ -375,21 +383,45 @@ class SuffixCacheAdapter:
                 is_excessive_repetition = True
             
             # 2. Check if token repeats too many times in recent context
-            recent_count = recent_tokens.count(token)
-            if recent_count > 3:  # If token already appeared >3 times in recent context
+            current_freq = token_freq.get(token, 0) + 1  # +1 for the current token
+            if current_freq > 3:  # If token already appeared >3 times in recent context
                 is_excessive_repetition = True
             
-            # 3. Check for repeated patterns (e.g., A-B-A-B)
-            if len(filtered_ids) >= 3:
-                if (token == filtered_ids[-2] and filtered_ids[-1] == filtered_ids[-3]):
+            # 3. Check for repeated patterns (e.g., A-B-A-B, A-B-C-A-B-C)
+            sequence_history.append(token)
+            # Check for 2-token patterns (A-B-A-B)
+            if len(sequence_history) >= 4:
+                if (sequence_history[-1] == sequence_history[-3] and 
+                    sequence_history[-2] == sequence_history[-4]):
+                    is_excessive_repetition = True
+            # Check for 3-token patterns (A-B-C-A-B-C)
+            if len(sequence_history) >= 6:
+                if (sequence_history[-1] == sequence_history[-4] and 
+                    sequence_history[-2] == sequence_history[-5] and 
+                    sequence_history[-3] == sequence_history[-6]):
+                    is_excessive_repetition = True
+            # Keep only the last 6 tokens for pattern detection
+            if len(sequence_history) > 6:
+                sequence_history = sequence_history[-6:]
+            
+            # 4. Check if token creates a sequence that repeats a recent context sequence
+            if len(filtered_ids) >= 2:
+                # Check for 2-token sequence repetition
+                recent_seq = tuple(filtered_ids[-2:] + [token])
+                context_str = tuple(recent_tokens[-3:])
+                if recent_seq == context_str:
                     is_excessive_repetition = True
             
             if not is_excessive_repetition:
                 filtered_ids.append(token)
-                # Update recent tokens
+                # Update recent tokens and frequency
                 recent_tokens.append(token)
-                if len(recent_tokens) > 10:
-                    recent_tokens = recent_tokens[1:]
+                if len(recent_tokens) > 15:
+                    old_token = recent_tokens.pop(0)
+                    token_freq[old_token] -= 1
+                    if token_freq[old_token] == 0:
+                        del token_freq[old_token]
+                token_freq[token] = token_freq.get(token, 0) + 1
             else:
                 # Replace with 0 (padding token) to reduce repetition but keep structure
                 filtered_ids.append(0)
