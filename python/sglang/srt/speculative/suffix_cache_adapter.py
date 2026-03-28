@@ -186,11 +186,9 @@ class SuffixCacheAdapter:
             # Convert to fixed-size arrays
             draft_ids = list(draft.token_ids)
             draft_parents = list(draft.parents)
-            
-            # First reorder to ensure proper tree structure
             draft_ids, draft_parents = self._reorder_tree_bfs(draft_ids, draft_parents)
             
-            # Then filter repetitive sequences
+            # Apply language model level constraints to reduce repetition
             draft_ids, draft_parents = self._filter_repetitive_sequences(draft_ids, draft_parents, tokens)
 
             context_token = tokens[-1] if tokens else 0
@@ -332,8 +330,13 @@ class SuffixCacheAdapter:
         self, token_ids: List[int], parents: List[Optional[int]], context_tokens: List[int]
     ) -> Tuple[List[int], List[int]]:
         """
-        Filter repetitive sequences in draft tokens to reduce repetition in generation.
-        This version preserves the tree structure by avoiding removal of nodes.
+        Apply language model level constraints to reduce repetition in draft tokens.
+        This method implements several mechanisms to ensure diversity in generated content:
+        
+        1. n-gram repetition restriction: Prevents repeating n-grams (3-5 tokens) from context
+        2. Sequence similarity detection: Avoids generating sequences too similar to recent content
+        3. Token frequency balancing: Ensures a balanced distribution of tokens
+        4. Pattern repetition detection: Identifies and avoids repetitive patterns
         
         Args:
             token_ids: List of draft token IDs
@@ -351,76 +354,73 @@ class SuffixCacheAdapter:
         filtered_ids = []
         filtered_parents = []
         
-        # Track recent tokens to detect repetition
-        recent_tokens = context_tokens[-15:]  # Last 15 tokens from context for better context awareness
+        # Get recent context for n-gram checking
+        recent_context = context_tokens[-50:]  # Larger context window for better repetition detection
         
-        # Track token frequency in current context
+        # Extract all n-grams from recent context (n=3,4,5)
+        context_ngrams = set()
+        for n in [3, 4, 5]:
+            for i in range(len(recent_context) - n + 1):
+                ngram = tuple(recent_context[i:i+n])
+                context_ngrams.add(ngram)
+        
+        # Track generated tokens in the current draft
+        current_draft = []
+        
+        # Track token frequency to ensure balance
         token_freq = {}
-        for token in recent_tokens:
+        for token in recent_context:
             token_freq[token] = token_freq.get(token, 0) + 1
         
         # Maximum allowed consecutive duplicates
         MAX_CONSECUTIVE_DUP = 2
         consecutive_counts = {}
         
-        # Track sequences to detect repeated patterns
-        sequence_history = []
-        
         for i, (token, parent) in enumerate(zip(token_ids, parents)):
-            # Check consecutive duplicates
-            consecutive_counts[token] = consecutive_counts.get(token, 0) + 1
-            
-            # Reset count for other tokens
+            # Reset consecutive count for other tokens
             for t in consecutive_counts:
                 if t != token:
                     consecutive_counts[t] = 0
+            consecutive_counts[token] = consecutive_counts.get(token, 0) + 1
             
-            # Check if this token would create excessive repetition
             is_excessive_repetition = False
             
             # 1. Check consecutive duplicates
             if consecutive_counts[token] > MAX_CONSECUTIVE_DUP:
                 is_excessive_repetition = True
             
-            # 2. Check if token repeats too many times in recent context
+            # 2. Check if token would create a repeated n-gram with current draft
+            check_seq = current_draft[-4:] + [token]  # Check for 3,4,5-grams
+            for n in [3, 4, 5]:
+                if len(check_seq) >= n:
+                    ngram = tuple(check_seq[-n:])
+                    if ngram in context_ngrams:
+                        is_excessive_repetition = True
+                        break
+            
+            # 3. Check token frequency balance
             current_freq = token_freq.get(token, 0) + 1  # +1 for the current token
-            if current_freq > 3:  # If token already appeared >3 times in recent context
+            if current_freq > 5:  # Allow maximum 5 occurrences of any token in context
                 is_excessive_repetition = True
             
-            # 3. Check for repeated patterns (e.g., A-B-A-B, A-B-C-A-B-C)
-            sequence_history.append(token)
-            # Check for 2-token patterns (A-B-A-B)
-            if len(sequence_history) >= 4:
-                if (sequence_history[-1] == sequence_history[-3] and 
-                    sequence_history[-2] == sequence_history[-4]):
-                    is_excessive_repetition = True
-            # Check for 3-token patterns (A-B-C-A-B-C)
-            if len(sequence_history) >= 6:
-                if (sequence_history[-1] == sequence_history[-4] and 
-                    sequence_history[-2] == sequence_history[-5] and 
-                    sequence_history[-3] == sequence_history[-6]):
-                    is_excessive_repetition = True
-            # Keep only the last 6 tokens for pattern detection
-            if len(sequence_history) > 6:
-                sequence_history = sequence_history[-6:]
-            
-            # 4. Check if token creates a sequence that repeats a recent context sequence
-            if len(filtered_ids) >= 2:
-                # Check for 2-token sequence repetition
-                recent_seq = tuple(filtered_ids[-2:] + [token])
-                context_str = tuple(recent_tokens[-3:])
-                if recent_seq == context_str:
-                    is_excessive_repetition = True
+            # 4. Check for repeated patterns (e.g., A-B-A-B, A-B-C-A-B-C)
+            if len(current_draft) >= 3:
+                # Check 2-token pattern repetition
+                if len(current_draft) >= 4:
+                    if (current_draft[-1] == current_draft[-3] and 
+                        token == current_draft[-2]):
+                        is_excessive_repetition = True
+                # Check 3-token pattern repetition
+                if len(current_draft) >= 6:
+                    if (current_draft[-2] == current_draft[-5] and 
+                        current_draft[-1] == current_draft[-4] and 
+                        token == current_draft[-3]):
+                        is_excessive_repetition = True
             
             if not is_excessive_repetition:
                 filtered_ids.append(token)
-                # Update recent tokens and frequency
-                recent_tokens.append(token)
-                if len(recent_tokens) > 15:
-                    old_token = recent_tokens.pop(0)
-                    token_freq[old_token] -= 1
-                    if token_freq[old_token] == 0:
-                        del token_freq[old_token]
+                current_draft.append(token)
+                # Update token frequency
                 token_freq[token] = token_freq.get(token, 0) + 1
             else:
                 # Replace with 0 (padding token) to reduce repetition but keep structure
