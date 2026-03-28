@@ -1,0 +1,56 @@
+# SUFFIX投机推理优化配置（减少重复生成）
+
+## 基础配置
+python -m sglang.launch_server \
+  --model-path <your-model-path> \
+  --speculative-algorithm SUFFIX \
+  
+## 核心参数调整（解决重复生成问题）
+  --speculative-num-draft-tokens 6  `# 从9减少到6，降低长重复序列风险` \
+  --speculative-suffix-max-tree-depth 24  `# 从48减少到24，减少捕获长重复模式的可能性` \
+  --speculative-suffix-max-spec-factor 0.8  `# 从默认1.0降低到0.8，减少过度投机` \
+  --speculative-suffix-min-token-prob 0.15  `# 从默认0.1提高到0.15，过滤低质量重复令牌` \
+  
+## 验证阈值调整
+  --speculative-accept-threshold-single 0.5  `# 稍微提高单个令牌接受阈值` \
+  --speculative-accept-threshold-acc 0.6  `# 稍微提高累积接受阈值` \
+
+## 重复惩罚配置（客户端请求时使用）
+# 这些参数在API请求时设置，例如：
+# curl -X POST http://localhost:3000/v1/completions \
+#   -H "Content-Type: application/json" \
+#   -d '{"prompt": "...", "frequency_penalty": 0.3, "presence_penalty": 0.2, "repetition_penalty": 1.1}'
+# 
+# frequency_penalty: 0.2-0.4  `# 基于频率的惩罚`
+# presence_penalty: 0.1-0.3   `# 基于存在的惩罚`
+# repetition_penalty: 1.05-1.2 `# 直接重复惩罚`
+
+## 配置说明
+1. **减少树深度和投机令牌数**：
+   - max_tree_depth从48→24：减少后缀树捕获长重复模式的能力
+   - num-draft-tokens从9→6：降低生成过长重复序列的风险
+
+2. **调整投机策略**：
+   - max_spec_factor=0.8：减少每个位置的投机令牌数量
+   - min_token_prob=0.15：提高投机令牌的质量要求
+
+3. **严格验证阈值**：
+   - 稍微提高接受阈值，减少低质量投机令牌的接受率
+
+4. **启用重复惩罚**：
+   - 在客户端请求时设置适当的重复惩罚参数
+   - 结合多种惩罚机制，从不同角度减少重复
+
+## 性能与质量平衡
+- 这些调整会轻微降低推理速度（5-15%），但能显著减少重复生成
+- 如果对性能要求极高，可以尝试更保守的调整：
+  - max_tree_depth=32
+  - num-draft-tokens=8
+  - max_spec_factor=0.9
+
+## 监控与调优
+- 观察生成结果的重复情况，逐步调整参数
+- 监控吞吐量变化，确保性能在可接受范围内
+- 根据不同任务类型调整参数：
+  - 创造性任务：使用更严格的惩罚参数
+  - 结构化任务：可以适当放宽惩罚参数

@@ -186,7 +186,12 @@ class SuffixCacheAdapter:
             # Convert to fixed-size arrays
             draft_ids = list(draft.token_ids)
             draft_parents = list(draft.parents)
+            
+            # First reorder to ensure proper tree structure
             draft_ids, draft_parents = self._reorder_tree_bfs(draft_ids, draft_parents)
+            
+            # Then filter repetitive sequences
+            draft_ids, draft_parents = self._filter_repetitive_sequences(draft_ids, draft_parents, tokens)
 
             context_token = tokens[-1] if tokens else 0
             draft_ids, draft_parents = self._inject_root_node(
@@ -322,6 +327,81 @@ class SuffixCacheAdapter:
                 reordered_parents.append(remap.get(parent, -1))
 
         return reordered_ids, reordered_parents
+
+    def _filter_repetitive_sequences(
+        self, token_ids: List[int], parents: List[Optional[int]], context_tokens: List[int]
+    ) -> Tuple[List[int], List[int]]:
+        """
+        Filter repetitive sequences in draft tokens to reduce repetition in generation.
+        This version preserves the tree structure by avoiding removal of nodes.
+        
+        Args:
+            token_ids: List of draft token IDs
+            parents: List of parent indices
+            context_tokens: Current context token sequence
+            
+        Returns:
+            Filtered token_ids and parents lists with preserved tree structure
+        """
+        if not token_ids:
+            return token_ids, parents
+            
+        # We don't remove nodes to preserve tree structure, instead we replace 
+        # repetitive tokens with 0 (padding) while keeping the parent structure intact
+        filtered_ids = []
+        filtered_parents = []
+        
+        # Track recent tokens to detect repetition
+        recent_tokens = context_tokens[-10:]  # Last 10 tokens from context
+        
+        # Maximum allowed consecutive duplicates
+        MAX_CONSECUTIVE_DUP = 2
+        consecutive_counts = {}
+        
+        for i, (token, parent) in enumerate(zip(token_ids, parents)):
+            # Check consecutive duplicates
+            consecutive_counts[token] = consecutive_counts.get(token, 0) + 1
+            
+            # Reset count for other tokens
+            for t in consecutive_counts:
+                if t != token:
+                    consecutive_counts[t] = 0
+            
+            # Check if this token would create excessive repetition
+            is_excessive_repetition = False
+            
+            # 1. Check consecutive duplicates
+            if consecutive_counts[token] > MAX_CONSECUTIVE_DUP:
+                is_excessive_repetition = True
+            
+            # 2. Check if token repeats too many times in recent context
+            recent_count = recent_tokens.count(token)
+            if recent_count > 3:  # If token already appeared >3 times in recent context
+                is_excessive_repetition = True
+            
+            # 3. Check for repeated patterns (e.g., A-B-A-B)
+            if len(filtered_ids) >= 3:
+                if (token == filtered_ids[-2] and filtered_ids[-1] == filtered_ids[-3]):
+                    is_excessive_repetition = True
+            
+            if not is_excessive_repetition:
+                filtered_ids.append(token)
+                # Update recent tokens
+                recent_tokens.append(token)
+                if len(recent_tokens) > 10:
+                    recent_tokens = recent_tokens[1:]
+            else:
+                # Replace with 0 (padding token) to reduce repetition but keep structure
+                filtered_ids.append(0)
+            
+            # Always keep the parent structure intact
+            filtered_parents.append(parent)
+        
+        # If all tokens were filtered, keep at least the first one
+        if not any(t != 0 for t in filtered_ids):
+            filtered_ids[0] = token_ids[0]
+            
+        return filtered_ids, filtered_parents
 
     def _inject_root_node(
         self, token_ids: List[int], parents: List[int], context_token: int

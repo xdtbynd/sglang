@@ -1,0 +1,60 @@
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+        "standard": {
+            "format": "[%(asctime)s.%(msecs)03d] %(name)s - %(levelname)s - %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S"
+        }
+    },
+    "handlers": {
+        "unified_file_handler": {
+            "class": "logging.FileHandler",
+            "filename": "/path/to/unified_sglang.log",
+            "mode": "a",
+            "formatter": "standard",
+            "encoding": "utf-8"
+        },
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+            "level": "INFO"
+        }
+    },
+    "loggers": {
+        "sglang": {
+            "handlers": ["unified_file_handler", "console"],
+            "level": "INFO",
+            "propagate": true
+        },
+        "sglang.srt": {
+            "handlers": ["unified_file_handler", "console"],
+            "level": "INFO",
+            "propagate": true
+        },
+        "sglang.srt.entrypoints": {
+            "handlers": ["unified_file_handler", "console"],
+            "level": "INFO",
+            "propagate": true
+        },
+        "sglang.srt.managers": {
+            "handlers": ["unified_file_handler", "console"],
+            "level": "INFO",
+            "propagate": true
+        },
+        "sglang.srt.disaggregation": {
+            "handlers": ["unified_file_handler", "console"],
+            "level": "INFO",
+            "propagate": true
+        },
+        "sglang_router": {
+            "handlers": ["unified_file_handler", "console"],
+            "level": "INFO",
+            "propagate": true
+        }
+    },
+    "root": {
+        "handlers": ["unified_file_handler", "console"],
+        "level": "INFO"
+    }
+}

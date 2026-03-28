@@ -428,16 +428,55 @@ class NgramVerifyInput(SpecInput):
 
         # Apply penalty
         if sampling_info.penalizer_orchestrator.is_required:
-            # This is a relaxed version of penalties for speculative decoding.
-            linear_penalty = torch.zeros(
-                (bs, logits_output.next_token_logits.shape[1]),
-                dtype=torch.float32,
-                device=self.device,
+            # Manually apply penalties to avoid broadcasting issues with speculative tokens
+            bs = batch.batch_size()
+            vocab_size = logits_output.next_token_logits.shape[1]
+            
+            # Create penalty tensor of shape (bs, vocab_size)
+            total_penalty = torch.zeros(
+                (bs, vocab_size), dtype=torch.float32, device=self.device
             )
-            sampling_info.apply_logits_bias(linear_penalty)
-            logits_output.next_token_logits.add_(
-                torch.repeat_interleave(linear_penalty, self.draft_token_num, dim=0)
-            )
+            
+            # Apply each penalizer manually
+            for penalizer in sampling_info.penalizer_orchestrator.penalizers.values():
+                if hasattr(penalizer, 'cumulated_frequency_penalties'):
+                    # Apply frequency penalty
+                    total_penalty.add_(penalizer.cumulated_frequency_penalties)
+                if hasattr(penalizer, 'cumulated_presence_penalties'):
+                    # Apply presence penalty
+                    total_penalty.add_(penalizer.cumulated_presence_penalties)
+            
+            # Apply repetition penalty manually
+            # repetition_penalty is not in penaltylib, need to implement it here
+            reqs = sampling_info.penalizer_orchestrator.reqs()
+            for batch_idx, req in enumerate(reqs):
+                repetition_penalty = req.sampling_params.repetition_penalty
+                if repetition_penalty != 1.0:
+                    # Get the tokens that have been generated so far
+                    generated_tokens = req.output_ids
+                    if generated_tokens:
+                        # Count the frequency of each token in the generated sequence
+                        token_counts = torch.bincount(
+                            torch.tensor(generated_tokens, device=self.device),
+                            minlength=vocab_size
+                        )
+                        # Apply repetition penalty: if a token has been generated before,
+                        # scale its logit by 1/repetition_penalty (if >1) or repetition_penalty (if <1)
+                        if repetition_penalty > 1.0:
+                            # Penalize repeated tokens
+                            penalty_mask = (token_counts > 0).float()
+                            total_penalty[batch_idx] += penalty_mask * (1.0 - repetition_penalty)
+                        elif repetition_penalty < 1.0:
+                            # Encourage repeated tokens
+                            penalty_mask = (token_counts > 0).float()
+                            total_penalty[batch_idx] += penalty_mask * (repetition_penalty - 1.0)
+            
+            # Repeat penalty tensor for each draft token position
+            # Shape: (bs, vocab_size) -> (bs * draft_token_num, vocab_size)
+            expanded_penalty = total_penalty.repeat_interleave(self.draft_token_num, dim=0)
+            
+            # Apply the penalty to logits
+            logits_output.next_token_logits.sub_(expanded_penalty)
 
         # Apply grammar mask
         if vocab_mask is not None:

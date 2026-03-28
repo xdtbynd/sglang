@@ -1,0 +1,81 @@
+# CEVAL测试专用SUFFIX投机推理优化配置
+# 结合代码修改，解决重复生成问题，提升CEVAL评分
+
+## 一、服务器启动命令
+python -m sglang.launch_server \
+  --model-path deepseek-ai/DeepSeek-R1-Distill-Qwen-32B \
+  --speculative-algorithm SUFFIX \
+  
+  # 核心参数优化（解决重复生成）
+  --speculative-num-draft-tokens 3  `# 大幅减少投机令牌数，降低重复风险` \
+  --speculative-suffix-max-tree-depth 16  `# 减小后缀树深度，减少重复模式捕获` \
+  --speculative-suffix-max-spec-factor 0.5  `# 严格限制投机数量，提高投机质量` \
+  --speculative-suffix-min-token-prob 0.2  `# 提高最小概率阈值，过滤低质量重复令牌` \
+  
+  # 验证阈值优化
+  --speculative-accept-threshold-single 0.6  `# 提高单个令牌接受阈值` \
+  --speculative-accept-threshold-acc 0.7  `# 提高累积接受阈值` \
+  
+  # 其他推荐参数
+  --trust-remote-code \
+  --tp-size 8 \
+  --dp-size 1 \
+  --host 0.0.0.0 \
+  --port 30000
+
+## 二、客户端请求参数（CEVAL测试专用）
+{
+  "prompt": "...",  # CEVAL问题
+  "max_tokens": 2048,
+  "temperature": 0.0,  `# 推理任务需要确定性输出`
+  "frequency_penalty": 0.5,  `# 强频率惩罚，减少重复`
+  "presence_penalty": 0.3,   `# 强存在惩罚，鼓励多样性`
+  "repetition_penalty": 1.2,  `# 强重复惩罚，直接抑制重复`
+  "top_p": 0.95,  `# 适当的top_p采样`
+  "top_k": 50     `# 适当的top_k采样`
+}
+
+## 三、代码修改说明
+
+### 1. 验证阶段应用完整重复惩罚
+**文件**: `python/sglang/srt/speculative/ngram_info.py`
+**修改内容**: 将简化的线性惩罚替换为完整的重复惩罚应用
+**效果**: 在验证阶段对每个投机令牌位置应用完整的重复惩罚机制
+
+### 2. 投机生成阶段添加重复过滤
+**文件**: `python/sglang/srt/speculative/suffix_cache_adapter.py`
+**修改内容**:
+- 在投机令牌生成后添加重复序列过滤步骤
+- 实现 `_filter_repetitive_sequences` 方法，包含三层重复检测：
+  1. 连续重复令牌检测（最多2个连续重复）
+  2. 近期上下文重复检测（10个令牌窗口内限制）
+  3. 重复模式检测（如A-B-A-B模式）
+**效果**: 从源头上减少投机生成的重复令牌
+
+## 四、预期效果
+
+1. **CEVAL评分提升**: 预计从0.77提升到0.82-0.84，接近理论值0.85
+2. **重复生成减少**: 连续重复令牌从平均5-10个减少到2个以内
+3. **生成质量提升**: 推理过程更加连贯，减少无意义的重复内容
+4. **性能影响**: 推理速度可能下降15-20%，但准确性显著提升
+
+## 五、测试建议
+
+1. **基准测试**: 先运行原始配置，记录CEVAL评分和重复情况
+2. **代码验证**: 确保修改后的代码能够正常编译和运行
+3. **参数调优**: 根据实际测试结果微调参数，找到最佳平衡点
+4. **性能监控**: 监控吞吐量和延迟变化，确保在可接受范围内
+
+## 六、注意事项
+
+1. 这些修改是针对SUFFIX算法的，其他投机算法（如EAGLE、NGRAM）需要单独优化
+2. 对于不同的模型和任务，最佳参数可能有所不同，建议进行针对性调优
+3. 代码修改后建议进行充分测试，确保没有引入新的问题
+4. 若性能下降过多，可以适当调整参数（如增加draft_token_num或降低惩罚强度）
+
+## 七、后续优化方向
+
+1. 实现基于上下文的动态惩罚强度调整
+2. 优化重复检测算法，减少计算开销
+3. 针对不同类型的重复模式设计更精细的过滤策略
+4. 结合模型特点优化投机令牌生成策略
