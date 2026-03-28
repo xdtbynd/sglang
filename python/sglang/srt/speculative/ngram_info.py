@@ -426,18 +426,101 @@ class NgramVerifyInput(SpecInput):
                 num_tokens_in_batch=self.draft_token_num,
             )
 
-        # Apply penalty
+        # Apply penalty - ULTRA AGGRESSIVE version for low temperature scenarios
         if sampling_info.penalizer_orchestrator.is_required:
-            # This is a relaxed version of penalties for speculative decoding.
-            linear_penalty = torch.zeros(
-                (bs, logits_output.next_token_logits.shape[1]),
-                dtype=torch.float32,
-                device=self.device,
+            # Get batch size and vocab size
+            bs = batch.batch_size()
+            vocab_size = logits_output.next_token_logits.shape[1]
+            
+            # Create penalty tensor
+            total_penalty = torch.zeros(
+                (bs, vocab_size), dtype=torch.float32, device=self.device
             )
+            
+            # Apply standard penalties from penaltylib
+            linear_penalty = torch.zeros_like(total_penalty)
             sampling_info.apply_logits_bias(linear_penalty)
-            logits_output.next_token_logits.add_(
-                torch.repeat_interleave(linear_penalty, self.draft_token_num, dim=0)
-            )
+            total_penalty.add_(linear_penalty)
+            
+            # Get requests to access sampling parameters
+            reqs = sampling_info.penalizer_orchestrator.reqs()
+            
+            # Add extreme repetition penalty specifically for low temperature scenarios
+            for batch_idx, req in enumerate(reqs):
+                # Check if we're in a low-temperature scenario
+                is_low_temperature = req.sampling_params.temperature < 0.5
+                
+                # 1. Enhanced repetition penalty with extreme scaling
+                repetition_penalty = req.sampling_params.repetition_penalty
+                if repetition_penalty != 1.0 or is_low_temperature:
+                    # Get all generated tokens
+                    generated_tokens = req.output_ids
+                    if generated_tokens:
+                        # Create a tensor of generated tokens
+                        gen_tokens = torch.tensor(generated_tokens, device=self.device)
+                        
+                        # Create a frequency map
+                        freq_map = torch.bincount(gen_tokens, minlength=vocab_size)
+                        
+                        # For low temperature, apply even stronger repetition penalties
+                        effective_repetition_penalty = repetition_penalty
+                        if is_low_temperature:
+                            # Boost repetition penalty by 2-3x for low temperature
+                            effective_repetition_penalty = 1.0 + (repetition_penalty - 1.0) * 3.0
+                            # Ensure minimum penalty strength
+                            if effective_repetition_penalty < 1.5:
+                                effective_repetition_penalty = 1.5
+                        
+                        if effective_repetition_penalty > 1.0:
+                            # Extreme penalty scaling for repeated tokens
+                            # Base penalty with exponential increase based on frequency
+                            penalty_scaling = torch.clamp(freq_map.float(), 0, 15)  # Increased cap for more extreme penalties
+                            # Exponential scaling factor: e^(0.2 * frequency) - 1
+                            exp_scaling = torch.exp(penalty_scaling * 0.2) - 1.0
+                            penalty = (1.0 - effective_repetition_penalty) * (1.0 + exp_scaling * 0.3)
+                            penalty_mask = (freq_map > 0).float()
+                            total_penalty[batch_idx] += penalty_mask * penalty
+                
+                # 2. Additional low-temperature specific penalties
+                if is_low_temperature:
+                    # Get generated tokens
+                    generated_tokens = req.output_ids
+                    if len(generated_tokens) >= 5:
+                        # Create n-gram penalty for recent context (2-4 grams)
+                        recent_gen = generated_tokens[-20:]  # Last 20 tokens
+                        recent_ngrams = set()
+                        
+                        # Extract recent n-grams
+                        for n in [2, 3, 4]:
+                            for i in range(len(recent_gen) - n + 1):
+                                recent_ngrams.add(tuple(recent_gen[i:i+n]))
+                        
+                        # Create a penalty mask for tokens that would form repeated n-grams
+                        ngram_penalty = torch.zeros(vocab_size, dtype=torch.float32, device=self.device)
+                        
+                        # For each possible next token, check if it forms a repeated n-gram
+                        for next_token in range(vocab_size):
+                            # Check 2-grams
+                            if len(recent_gen) >= 1:
+                                ngram_2 = tuple(recent_gen[-1:] + [next_token])
+                                if ngram_2 in recent_ngrams:
+                                    ngram_penalty[next_token] -= 10.0  # Massive penalty for repeated 2-grams
+                            # Check 3-grams
+                            if len(recent_gen) >= 2:
+                                ngram_3 = tuple(recent_gen[-2:] + [next_token])
+                                if ngram_3 in recent_ngrams:
+                                    ngram_penalty[next_token] -= 20.0  # Even bigger penalty for 3-grams
+                            # Check 4-grams
+                            if len(recent_gen) >= 3:
+                                ngram_4 = tuple(recent_gen[-3:] + [next_token])
+                                if ngram_4 in recent_ngrams:
+                                    ngram_penalty[next_token] -= 30.0  # Extreme penalty for 4-grams
+                        
+                        total_penalty[batch_idx] += ngram_penalty
+            
+            # Apply the total penalty to all draft tokens
+            expanded_penalty = total_penalty.repeat_interleave(self.draft_token_num, dim=0)
+            logits_output.next_token_logits.add_(expanded_penalty)
 
         # Apply grammar mask
         if vocab_mask is not None:
