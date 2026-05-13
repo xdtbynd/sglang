@@ -92,10 +92,9 @@ RUN . /etc/environment_new && \
     (${PIP_INSTALL} ${TRITON_URL})
 
 # Install SGLang
-RUN git clone https://github.com/Ascend/sglang.git --branch $SGLANG_TAG && \
-    export SETUPTOOLS_SCM_PRETEND_VERSION=v0.5.10rc1+npu && \
-    (cd sglang/python && rm -rf pyproject.toml && mv pyproject_npu.toml pyproject.toml && ${PIP_INSTALL} -v .[all_npu]) && \
-    rm -rf sglang
+RUN git clone https://github.com/sgl-project/sglang --branch $SGLANG_TAG /sgl-workspace/sglang && \
+    cd /sgl-workspace/sglang/python && rm -rf pyproject.toml && mv pyproject_npu.toml pyproject.toml && \
+    ${PIP_INSTALL} -v -e .[all_npu]
 
 # Install Deep-ep
 # pin wheel to 0.45.1 ref: https://github.com/pypa/wheel/issues/662
