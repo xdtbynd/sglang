@@ -13,13 +13,14 @@ ARG PIP_INDEX_URL="https://pypi.org/simple/"
 ARG APTMIRROR=""
 ARG PYTORCH_VERSION="2.10.0"
 ARG TORCHVISION_VERSION="0.25.0"
+ARG TORCHAUDIO_VERSION="2.10.0"
 ARG PTA_URL_ARM64="https://gitcode.com/Ascend/pytorch/releases/download/v26.0.0-pytorch2.10.0/torch_npu-2.10.0-cp311-cp311-manylinux_2_28_aarch64.whl"
 ARG PTA_URL_AMD64="https://gitcode.com/Ascend/pytorch/releases/download/v26.0.0-pytorch2.10.0/torch_npu-2.10.0-cp311-cp311-manylinux_2_28_x86_64.whl"
 ARG TRITON_URL_ARM64="https://gitcode.com/Ascend/triton-ascend/releases/download/v3.2.1/triton_ascend-3.2.1-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl"
 ARG TRITON_URL_AMD64="https://gitcode.com/Ascend/triton-ascend/releases/download/v3.2.1/triton_ascend-3.2.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
 ARG SGLANG_TAG=main
 ARG ASCEND_CANN_PATH=/usr/local/Ascend/ascend-toolkit
-ARG SGLANG_KERNEL_NPU_TAG=2026.05.01.post2
+ARG SGLANG_KERNEL_NPU_TAG=2026.05.01.post3
 
 ARG PIP_INSTALL="python3 -m pip install --no-cache-dir"
 ARG DEVICE_TYPE
@@ -87,7 +88,7 @@ RUN ${PIP_INSTALL} sglang-router
 
 ### Install PyTorch and PTA
 RUN . /etc/environment_new && \
-    (${PIP_INSTALL} torch==${PYTORCH_VERSION} torchvision==${TORCHVISION_VERSION} --index-url https://download.pytorch.org/whl/cpu) \
+    (${PIP_INSTALL} torch==${PYTORCH_VERSION} torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} --index-url https://download.pytorch.org/whl/cpu) \
     && (${PIP_INSTALL} ${PTA_URL})
 
 
