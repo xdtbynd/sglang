@@ -127,6 +127,9 @@ LLAMA_3_8B_INSTRUCT_WEIGHTS_PATH = os.path.join(
 LLAMA_4_SCOUT_17B_16E_INSTRUCT_WEIGHTS_PATH = os.path.join(
     MODEL_WEIGHTS_DIR, "meta-llama/Llama-4-Scout-17B-16E-Instruct"
 )
+LLaDA2_0_MINI_WEIGHTS_PATH = os.path.join(
+    MODEL_WEIGHTS_DIR, "inclusionAI/LLaDA2.0-mini"
+)
 META_LLAMA_3_1_8B_INSTRUCT = os.path.join(
     MODEL_WEIGHTS_DIR, "LLM-Research/Meta-Llama-3.1-8B-Instruct"
 )
