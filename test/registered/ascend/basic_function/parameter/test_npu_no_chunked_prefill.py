@@ -26,7 +26,7 @@ class TestNoChunkedPrefill(CustomTestCase):
             run_mmlu_test(
                 disable_radix_cache=False,
                 enable_mixed_chunk=False,
-                chunked_prefill_size=-1
+                chunked_prefill_size=-1,
             )
         finally:
             _test_utils.DEFAULT_MODEL_NAME_FOR_TEST = original_model
