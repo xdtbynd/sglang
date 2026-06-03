@@ -61,7 +61,7 @@ def run_evalscope(
     model,
     datasets,
     dataset_args=None,
-    eval_batch_size=1,
+    eval_batch_size=16,
     limit=100000,
     generation_config=None,
     dataset_dir=None,
@@ -222,7 +222,7 @@ class TestAscendAccuracyTestCaseBase(CustomTestCase):
     backend = "sglang"
     datasets = ["gsm8k"]
     dataset_args = None
-    eval_batch_size = 1
+    eval_batch_size = 16
     limit = 100000
     generation_config = None
     dataset_dir = None
@@ -293,7 +293,7 @@ class TestAscendAccuracyMultiNodePdMixTestCaseBase(CustomTestCase):
     backend = "sglang"
     datasets = ["gsm8k"]
     dataset_args = None
-    eval_batch_size = 1
+    eval_batch_size = 16
     limit = 100000
     generation_config = None
     dataset_dir = None
@@ -381,7 +381,7 @@ class TestAscendAccuracyMultiNodePdSepTestCaseBase(CustomTestCase):
     backend = "sglang"
     datasets = ["gsm8k"]
     dataset_args = None
-    eval_batch_size = 1
+    eval_batch_size = 16
     limit = 100000
     generation_config = None
     dataset_dir = None
