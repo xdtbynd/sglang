@@ -152,11 +152,11 @@ MODEL_CONFIG = {
 class TestNPUBucketAdjustIntervalSecsConcurrency(
     TestAscendPerfMultiNodePdSepTestCaseBase
 ):
-    """Testcase：Verify after configuring the --bucket-adjust-interval-secs parameter for the PD classification scenario
-    router, the service can stably support 2048 concurrent requests
+    """Testcase：After configuring the --prefill-policy parameter as bucket for the PD classification scenario and
+    setting the relevant parameters, verify that the router service can stably support 2048 concurrent requests
 
     [Test Category] Parameter
-    [Test Target] --bucket-adjust-interval-secs
+    [Test Target] --prefill-policy; --bucket-adjust-interval-secs; --balance-abs-threshold; --balance-rel-threshold
     """
 
     benchmark_tool = BENCHMARK_TOOL_DEFAULT

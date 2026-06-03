@@ -706,7 +706,7 @@ jobs:
       matrix:
         test_config:
           - name: test_npu_bucket_adjust_interval_secs_concurrency
-            test_case: test/registered/ascend/basic_function/parallel_strategy/expert_parallelism/test_npu_bucket_adjust_interval_secs_concurrency.py
+            test_case: test/registered/ascend/basic_function/parallel_strategy/test_npu_bucket_adjust_interval_secs_concurrency.py
             test_type: 'func'
             prefill_decode_deployment: 'separation'
             prefill_size: 3
