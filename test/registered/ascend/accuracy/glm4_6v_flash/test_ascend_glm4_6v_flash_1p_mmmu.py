@@ -57,7 +57,7 @@ class TestQwen3(TestAscendAccuracyTestCaseBase):
     model = GLM_4_6V_FLASH_MODEL_PATH
     envs = ENVS
     other_args = OTHER_ARGS
-    accuracy = 71.1
+    accuracy = 0.711
     datasets = ["mmmu"]
     few_shot_num = 0
     generation_config = {"max_tokens": 65536, "temperature": 1.0}
