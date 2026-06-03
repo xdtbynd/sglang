@@ -110,8 +110,8 @@ class TestQwen32B_mmlupro(TestAscendAccuracyTestCaseBase):
     model = QWEN3_32B_W8A8_MODEL_PATH
     envs = QWEN3_32B_ENVS
     other_args = QWEN3_32B_OTHER_ARGS
-    accuracy = 65.54
-    datasets = ["mmlu_pro"]
+    accuracy = 0.516
+    datasets = ["gpqa_diamond"]
     few_shot_num = 5
     generation_config = {"max_tokens": 65536, "temperature": 1.0}
     max_concurrency = 16
