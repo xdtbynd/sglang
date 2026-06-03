@@ -105,7 +105,7 @@ class TestNPUQwen3_6_27B_1P_In3k5_Out1k5_gpqa(TestAscendAccuracyTestCaseBase):
     model = QWEN3_6_27B_W8A8_MODEL_PATH
     envs = QWEN3_6_27B_3K5_1K5_ENVS
     other_args = QWEN3_6_27B_3K5_1K5_OTHER_ARGS
-    accuracy = 85.5
+    accuracy = 0.855
     datasets = ["gpqa_diamond"]
     few_shot_num = 0
     generation_config = {"max_tokens": 65536, "temperature": 1.0}
