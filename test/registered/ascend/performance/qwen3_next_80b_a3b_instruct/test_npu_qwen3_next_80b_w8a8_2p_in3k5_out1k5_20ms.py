@@ -100,7 +100,7 @@ class TestNPUQwen3Next80BA3B2PIn3k5Out1k5_20ms(TestAscendPerformanceTestCaseBase
     output_len = 1500
     random_range_ratio = 1
     tpot = 20
-    output_token_throughput = 50
+    output_token_throughput = 82.24
 
     def test_npu_qwen3_next_80b_a3b_2p_in3k5_out1k5_20ms(self):
         self.run_throughput()

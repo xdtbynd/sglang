@@ -17,8 +17,8 @@ register_npu_ci(
 )
 
 QWEN3_NEXT_80B_A3B_2P_ENVS = {
-    "PYTORCH_NPU_ALLOC_CONF": "expandable_segments:True",
     "SGLANG_SET_CPU_AFFINITY": "1",
+    "PYTORCH_NPU_ALLOC_CONF": "expandable_segments:True",
     "STREAMS_PER_DEVICE": "32",
     "HCCL_SOCKET_IFNAME": "lo",
     "GLOO_SOCKET_IFNAME": "lo",
@@ -35,7 +35,13 @@ QWEN3_NEXT_80B_A3B_2P_ENVS = {
     "SGLANG_ENABLE_SPEC_V2": "1",
     "SGLANG_ENABLE_OVERLAP_PLAN_STREAM": "1",
     "FORCE_DRAFT_MODEL_NON_QUANT": "1",
-    "HCCL_BUFFSIZE": "2000",
+    "HCCL_BUFFSIZE": "64",
+    "ZBAL_HCCL_OP": "allreduce,_allgather_base,allgather,broadcast,scatter,reduce_scatter,_reduce_scatter_base,alltoall_base",
+    "SGLANG_ZBAL_LOCAL_MEM_SIZE": "59648",
+    "SGLANG_ENABLE_TP_MEMORY_INBALANCE_CHECK": "0",
+    "SGLANG_ZBAL_BOOTSTRAP_URL": "tcp://127.0.0.1:24669",
+    "ZBAL_NPU_ALLOC_CONF": "use_vmm_for_static_memory:True",
+    "ZBAL_ENABLE_GRAPH": "1",
 }
 
 QWEN3_NEXT_80B_A3B_2P_OTHER_ARGS = [
@@ -62,22 +68,9 @@ QWEN3_NEXT_80B_A3B_2P_OTHER_ARGS = [
     "--chunked-prefill-size",
     -1,
     "--max-running-requests",
-    220,
-    "--cuda-graph-bs",
-    2,
-    4,
-    8,
-    16,
-    24,
-    32,
-    48,
-    64,
-    80,
-    110,
+    300,
     "--mamba-ssm-dtype",
     "bfloat16",
-    "--base-gpu-id",
-    12,
     "--speculative-algorithm",
     "NEXTN",
     "--speculative-num-steps",
@@ -98,6 +91,45 @@ QWEN3_NEXT_80B_A3B_2P_OTHER_ARGS = [
     "deepep",
     "--deepep-mode",
     "auto",
+    "--cuda-graph-bs",
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    10,
+    12,
+    14,
+    16,
+    18,
+    20,
+    22,
+    24,
+    26,
+    28,
+    30,
+    32,
+    40,
+    44,
+    48,
+    52,
+    56,
+    60,
+    64,
+    72,
+    80,
+    88,
+    96,
+    104,
+    112,
+    120,
+    128,
+    136,
+    144,
+    150,
 ]
 
 
@@ -109,12 +141,12 @@ class TestNPUQwen3Next80BA3B2PIn3k5Out1k5_50ms(TestAscendPerformanceTestCaseBase
     envs = QWEN3_NEXT_80B_A3B_2P_ENVS
     dataset_name = "random"
     max_concurrency = 220
-    num_prompts = 880
+    num_prompts = 220
     input_len = 3500
     output_len = 1500
     random_range_ratio = 1
     tpot = 50
-    output_token_throughput = 1410
+    output_token_throughput = 4293
 
     def test_npu_qwen3_next_80b_a3b_2p_in3k5_out1k5_50ms(self):
         self.run_throughput()
