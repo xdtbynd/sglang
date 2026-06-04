@@ -25,6 +25,7 @@ from sglang.test.ascend.e2e.test_npu_multi_node_utils import (
 from sglang.test.test_utils import (
     DEFAULT_URL_FOR_TEST,
     CustomTestCase,
+    dump_metric,
     popen_launch_server,
 )
 
@@ -722,6 +723,16 @@ def assert_metrics(self, metrics):
     """
     if not metrics:
         raise Exception("No metrics obtained from benchmark")
+
+    tc_name = self.__class__.__name__
+    if self.tpot and metrics.get("mean_tpot"):
+        dump_metric("tpot", float(metrics["mean_tpot"]), labels={"test_case": tc_name, "type": "perf"})
+    if self.output_token_throughput and metrics.get("total_tps"):
+        dump_metric("throughput", float(metrics["total_tps"]), labels={"test_case": tc_name, "type": "perf"})
+    if self.ttft and metrics.get("mean_ttft"):
+        dump_metric("ttft", float(metrics["mean_ttft"]), labels={"test_case": tc_name, "type": "perf"})
+    if self.mean_e2e_latency and metrics.get("mean_e2e_latency"):
+        dump_metric("e2e_latency", float(metrics["mean_e2e_latency"]), labels={"test_case": tc_name, "type": "perf"})
 
     if self.tpot:
         if self.tpot < TPOT_THRESHOLD:
