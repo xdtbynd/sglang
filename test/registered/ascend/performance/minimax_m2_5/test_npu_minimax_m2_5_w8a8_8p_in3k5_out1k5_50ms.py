@@ -118,7 +118,7 @@ class TestNPUMiniMaxM2_5_W8A8_8P_In3k5_Out1k5_aime25(TestAscendAccuracyTestCaseB
     datasets = ["aime25"]
     few_shot_num = 5
     generation_config = {"max_tokens": 65536, "temperature": 1.0}
-    max_concurrency = 16
+    max_concurrency = 64
 
     def test_accuracy(self):
         self.run_accuracy()
