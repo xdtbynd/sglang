@@ -4,7 +4,6 @@ from sglang.test.ascend.e2e.test_npu_accuracy_utils import (
     TestAscendAccuracyTestCaseBase,
 )
 from sglang.test.ascend.e2e.test_npu_performance_utils import (
-    AISBENCHMARK_DATASET_DEFAULT,
     BENCHMARK_TOOL_DEFAULT,
     DEFAULT_URL_FOR_TEST,
     QWEN3_6_35B_A3B_MODEL_PATH,
@@ -119,19 +118,18 @@ class TestNPUQwen3_6_35BA3B_1P_In64k_Out1k_Prefix90_50ms(
 
     base_url = DEFAULT_URL_FOR_TEST
     benchmark_tool = BENCHMARK_TOOL_DEFAULT
-    aisbench_dataset_type = AISBENCHMARK_DATASET_DEFAULT
     model = QWEN3_6_35B_A3B_MODEL_PATH
     other_args = QWEN3_6_35B_A3B_64K_PREFIX_OTHER_ARGS
     envs = QWEN3_6_35B_A3B_64K_PREFIX_ENVS
-    dataset_name = "random"
+    dataset_name = "generated-shared-prefix"
     max_concurrency = 40
     num_prompts = 160
     input_len = 65536
     output_len = 1024
     random_range_ratio = 1
-    prefix_hit_rate = 0.9
+    repeat_rate = 0.9
     tpot = 50
-    aisbench_request_rate = 16
+    request_rate = float("inf")
     output_token_throughput = 660
 
     @classmethod
