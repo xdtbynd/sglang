@@ -151,12 +151,11 @@ class TestNPUKimiK2_6_W4A8_1P1D_16p_In64k_Out1k5_Prefix90_100ms(
 
     model_config = MODEL_CONFIG
     benchmark_tool = BENCHMARK_TOOL_DEFAULT
-    aisbench_dataset_type = AISBENCHMARK_DATASET_DEFAULT
-    dataset_name = "random"
+    dataset_name = "generated-shared-prefix"
     max_concurrency = 2
     num_prompts = 16
-    request_rate = 1
-    aisbench_repeat_rate = 0.9
+    request_rate = float("inf")
+    repeat_rate = 0.9
     input_len = 65536
     output_len = 1536
     random_range_ratio = 1
