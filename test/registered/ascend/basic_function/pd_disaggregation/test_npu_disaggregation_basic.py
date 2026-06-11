@@ -51,14 +51,14 @@ class TestNPUDisaggregationAccuracy(
     @classmethod
     def start_prefill(cls):
         prefill_args = [
-                           "--trust-remote-code",
-                           "--disaggregation-mode",
-                           "prefill",
-                           "--disaggregation-bootstrap-port",
-                           cls.bootstrap_port,
-                           "--tp",
-                           "1",
-                       ] + list(cls.extra_prefill_args)
+            "--trust-remote-code",
+            "--disaggregation-mode",
+            "prefill",
+            "--disaggregation-bootstrap-port",
+            cls.bootstrap_port,
+            "--tp",
+            "1",
+        ] + list(cls.extra_prefill_args)
         prefill_args += cls.transfer_backend + cls.rdma_devices
         env = {
             **os.environ,
@@ -75,16 +75,16 @@ class TestNPUDisaggregationAccuracy(
     @classmethod
     def start_decode(cls):
         decode_args = [
-                          "--trust-remote-code",
-                          "--disaggregation-mode",
-                          "decode",
-                          "--disaggregation-bootstrap-port",
-                          cls.bootstrap_port,
-                          "--tp",
-                          "1",
-                          "--base-gpu-id",
-                          "1",
-                      ] + list(cls.extra_decode_args)
+            "--trust-remote-code",
+            "--disaggregation-mode",
+            "decode",
+            "--disaggregation-bootstrap-port",
+            cls.bootstrap_port,
+            "--tp",
+            "1",
+            "--base-gpu-id",
+            "1",
+        ] + list(cls.extra_decode_args)
         decode_args += cls.transfer_backend + cls.rdma_devices
         env = {
             **os.environ,
