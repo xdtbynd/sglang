@@ -25,7 +25,7 @@ QWEN3_6_27B_16K_1k_ENVS = {
     "SGLANG_ENABLE_SPEC_V2": "1",
     "SGLANG_ENABLE_OVERLAP_PLAN_STREAM": "1",
     "SGLANG_SCHEDULER_DECREASE_PREFILL_IDLE": "1",
-    "SGLANG_PREFILL_DELAYER_MAX_DELAY_PASSES": "30",
+    "SGLANG_PREFILL_DELAYER_MAX_DELAY_PASSES": "130",
     "ASCEND_USE_FIA": "1",
 }
 
@@ -57,6 +57,7 @@ QWEN3_6_27B_16K_1k_OTHER_ARGS = [
     16,
     20,
     24,
+    26,
     28,
     "--enable-multimodal",
     "--quantization",
