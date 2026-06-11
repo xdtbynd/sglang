@@ -97,6 +97,7 @@ class TestNPUDisaggregation(PauseResumeInPlaceMixin, PDDisaggregationServerBase)
         )
 
     def test_logprob(self):
+        """Verify input/output token logprob length consistency"""
         prompt = "The capital of france is "
         response = requests.post(
             self.lb_url + "/generate",
@@ -126,6 +127,7 @@ class TestNPUDisaggregation(PauseResumeInPlaceMixin, PDDisaggregationServerBase)
         )
 
     def test_chat_completion_top_logprobs(self):
+        """Check OpenAI chat api top-k logprob structure"""
         client = openai.Client(api_key="empty", base_url=f"{self.lb_url}/v1")
         response = client.chat.completions.create(
             model="dummy",
@@ -152,6 +154,7 @@ class TestNPUDisaggregation(PauseResumeInPlaceMixin, PDDisaggregationServerBase)
         self.assertIsInstance(first_top_logprobs[0].token, str)
 
     def test_first_token_finish(self):
+        """Test early stop on first generated token: EOS / ignore_eos / custom stop"""
         client = openai.Client(api_key="empty", base_url=f"{self.lb_url}/v1")
         tokenizer = AutoTokenizer.from_pretrained(self.model)
         eos_token = tokenizer.eos_token_id
