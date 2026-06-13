@@ -1,8 +1,3 @@
-"""Stage-a basic sanity: small-but-broad server smoke that downstream
-stages depend on. Multiple sanity-kit mixins driving one shared server,
-covering protocol, decode correctness, scheduler stress, occupancy, and
-hellaswag accuracy."""
-
 import unittest
 
 from sglang.srt.utils import is_hip, kill_process_tree
