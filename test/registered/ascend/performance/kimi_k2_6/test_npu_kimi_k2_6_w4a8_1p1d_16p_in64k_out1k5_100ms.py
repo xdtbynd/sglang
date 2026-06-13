@@ -3,6 +3,7 @@ import unittest
 from sglang.test.ascend.e2e.test_npu_performance_utils import (
     AISBENCHMARK_DATASET_DEFAULT,
     BENCHMARK_TOOL_DEFAULT,
+    KIMI_K2_6_EAGLE3_MODEL_PATH,
     KIMI_K2_6_W4A8_MODEL_PATH,
     TestAscendPerfMultiNodePdSepTestCaseBase,
 )
@@ -28,7 +29,6 @@ PREFILL_ENVS = {
     "ZBAL_NPU_ALLOC_CONF": "use_vmm_for_static_memory:True",
     "SGLANG_ZBAL_BOOTSTRAP_URL": "tcp://127.0.0.1:24699",
     "ZBAL_ENABLE_GRAPH": "1",
-    "ZBAL_HCCL_OP": "send,recv",
 }
 
 DECODE_ENVS = {
@@ -111,7 +111,7 @@ DECODE_ARGS = [
     "--mem-fraction-static",
     0.82,
     "--max-running-requests",
-    16,
+    1,
     "--enable-dp-attention",
     "--dp-size",
     1,
@@ -128,6 +128,18 @@ DECODE_ARGS = [
     "auto",
     "--cuda-graph-bs",
     16,
+    "--speculative-algorithm",
+    "EAGLE3",
+    "--speculative-draft-model-path",
+    KIMI_K2_6_EAGLE3_MODEL_PATH,
+    "--speculative-num-steps",
+    4,
+    "--speculative-eagle-topk",
+    1,
+    "--speculative-num-draft-tokens",
+    5,
+    "--speculative-draft-model-quantization",
+    "unquant",
 ]
 
 MODEL_CONFIG = {
@@ -153,8 +165,8 @@ class TestNPUKimiK2_6_W4A8_1P1D_16p_In64k_Out1k5_100ms(
     max_concurrency = 1
     num_prompts = 1
     request_rate = float("inf")
-    input_len = 65536
-    output_len = 1536
+    input_len = 64000
+    output_len = 1500
     random_range_ratio = 1
     tpot = 100
     output_token_throughput = 24.15
