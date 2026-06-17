@@ -12,22 +12,17 @@ from sglang.test.test_utils import (
     CustomTestCase,
     popen_launch_server,
 )
-
-try:
-    import granian  # noqa: F401
-
-    _HAS_GRANIAN = True
-except ImportError:
-    _HAS_GRANIAN = False
+import granian
 
 register_npu_ci(est_time=100, suite="full--npu-a3", nightly=True)
 
 
-@unittest.skipUnless(_HAS_GRANIAN, "granian not installed (pip install sglang[http2])")
 class TestHTTP2Server(CustomTestCase):
-    """Test HTTP/2 server (Granian) on NPU.
+    """Test HTTP/2 server (Granian) with basic OpenAI-compatible endpoints.
+    Verifies that --enable-http2 launches successfully and serves requests
+    via both HTTP/1.1 and HTTP/2 (h2c).
 
-    [Test Category] Interface
+    [Test Category] Parameter
     [Test Target] --enable-http2
     """
 
