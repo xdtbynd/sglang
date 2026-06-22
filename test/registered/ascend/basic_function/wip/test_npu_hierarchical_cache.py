@@ -163,6 +163,32 @@ class TestDeepSeekV32HierarchicalCacheHit(TestAscendPerfMultiNodePdSepTestCaseBa
         cached_tokens = result.get("meta_info").get("cached_tokens", 0)
         return cached_tokens
 
+    @check_role(allowed_roles=["router"])
+    def run_gsm8k_test(
+        self,
+        expect_accuracy,
+        num_shots=8,
+        data_path=None,
+        num_questions=200,
+        max_new_tokens=512,
+        parallel=128,
+    ):
+        args = SimpleNamespace(
+            num_shots=num_shots,
+            data_path=data_path,
+            num_questions=num_questions,
+            max_new_tokens=max_new_tokens,
+            parallel=parallel,
+            host=f"http://{self.host}",
+            port=self.port,
+        )
+        metrics = run_eval_gsm8k(args)
+        self.assertGreaterEqual(
+            metrics["accuracy"],
+            expect_accuracy,
+            f'Accuracy is {str(metrics["accuracy"])}, is lower than {expect_accuracy}',
+        )
+
     def test_hierarchical_cache_hit_and_ttft_reduce(self):
         self.__class__.model_config = MODEL_CONFIG_DISABLE_HIERARCHICAL_CACHE
         try:
@@ -239,34 +265,7 @@ class TestDeepSeekV32HierarchicalCacheHit(TestAscendPerfMultiNodePdSepTestCaseBa
                 msg="TTFT should be reduced after cache hit",
             )
 
-            accuracy = 0.95
-            self.run_gsm8k_test(self.accuracy, num_shots=5)
-
-            @check_role(allowed_roles=["router"])
-            def run_gsm8k_test(
-                self,
-                expect_accuracy,
-                num_shots=8,
-                data_path=None,
-                num_questions=200,
-                max_new_tokens=512,
-                parallel=128,
-            ):
-                args = SimpleNamespace(
-                    num_shots=num_shots,
-                    data_path=data_path,
-                    num_questions=num_questions,
-                    max_new_tokens=max_new_tokens,
-                    parallel=parallel,
-                    host=f"http://{self.host}",
-                    port=self.port,
-                )
-                metrics = run_eval_gsm8k(args)
-                self.assertGreaterEqual(
-                    metrics["accuracy"],
-                    expect_accuracy,
-                    f'Accuracy is {str(metrics["accuracy"])}, is lower than {expect_accuracy}',
-                )
+            self.run_gsm8k_test(0.95, num_shots=5)
 
         finally:
             if self.process:
