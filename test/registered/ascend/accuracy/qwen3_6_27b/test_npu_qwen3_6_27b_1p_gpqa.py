@@ -92,7 +92,7 @@ class TestNPUQwen3_6_27B_1P_In64k_Out1k_Prefix90_gpqa(TestAscendAccuracyTestCase
         "max_tokens": 81920,
         "temperature": 1.0,
         "extra_body": {
-            "chat_template_kwargs":{"enable_thinking": True},
+            "chat_template_kwargs": {"enable_thinking": True},
         },
     }
 
