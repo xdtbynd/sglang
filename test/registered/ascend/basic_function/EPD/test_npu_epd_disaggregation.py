@@ -35,12 +35,8 @@ from urllib.parse import urlparse
 
 import openai
 import requests
+from sglang.srt.utils import kill_process_tree
 
-from sglang.test.ci.ci_register import register_npu_ci
-from sglang.test.kits.mmmu_vlm_kit import MMMUMixin
-from sglang.test.server_fixtures.disaggregation_fixture import (
-    PDDisaggregationServerBase,
-)
 from sglang.test.ascend.test_ascend_utils import (
     IMAGES_MAN_PATH,
     QWEN2_5_VL_3B_INSTRUCT_WEIGHTS_PATH,
@@ -48,14 +44,17 @@ from sglang.test.ascend.test_ascend_utils import (
     QWEN3_OMNI_30B_A3B_THINKING_MODEL_PATH,
     VIDEO_JOBS_PATH,
 )
+from sglang.test.ci.ci_register import register_npu_ci
+from sglang.test.kits.mmmu_vlm_kit import MMMUMixin
+from sglang.test.server_fixtures.disaggregation_fixture import (
+    PDDisaggregationServerBase,
+)
 from sglang.test.test_utils import (
     DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
     DEFAULT_URL_FOR_TEST,
-    CustomTestCase,
     is_in_ci,
     popen_launch_server,
 )
-from sglang.srt.utils import kill_process_tree
 
 # NPU common server arguments shared by all server roles.
 NPU_COMMON_ARGS = [
@@ -114,15 +113,9 @@ def _chat_completion(base_url: str, model: str, content: list, **kwargs) -> str:
         "messages": [{"role": "user", "content": content}],
     }
     payload.update(kwargs)
-    resp = requests.post(
-        f"{base_url}/v1/chat/completions", json=payload, timeout=300
-    )
-    assert (
-        resp.status_code == 200
-    ), f"Request failed {resp.status_code}: {resp.text[:300]}"
-    return (
-        resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-    )
+    resp = requests.post(f"{base_url}/v1/chat/completions", json=payload, timeout=300)
+    assert resp.status_code == 200, f"Request failed {resp.status_code}: {resp.text[:300]}"
+    return resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
 
 
 class NpuEPDBase(PDDisaggregationServerBase):
@@ -149,9 +142,11 @@ class NpuEPDBase(PDDisaggregationServerBase):
         # ``PDDisaggregationServerBase``: in CI the base class forces
         # ``--disaggregation-transfer-backend mooncake`` (GPU/RDMA-only),
         # which fails on NPU with ``ModuleNotFoundError: No module named
-        # 'mooncake'``.  NPU PD disaggregation uses the default backend
-        # (no explicit --disaggregation-transfer-backend flag).
-        cls.transfer_backend = []
+        # 'mooncake'``.  Additionally, sglang's default value for
+        # ``--disaggregation-transfer-backend`` is also "mooncake", so we
+        # MUST explicitly pass the NPU-native "ascend" backend for PD
+        # disaggregation to avoid loading the mooncake transfer engine.
+        cls.transfer_backend = ["--disaggregation-transfer-backend", "ascend"]
         cls.rdma_devices = []
         parsed = urlparse(DEFAULT_URL_FOR_TEST)
         cls.base_host = parsed.hostname
@@ -262,9 +257,7 @@ class NpuEPDBase(PDDisaggregationServerBase):
         t_prefill.join()
         t_decode.join()
         cls.wait_server_ready(cls.encode_url + "/health", process=cls.process_encode)
-        cls.wait_server_ready(
-            cls.prefill_url + "/health", process=cls.process_prefill
-        )
+        cls.wait_server_ready(cls.prefill_url + "/health", process=cls.process_prefill)
         cls.wait_server_ready(cls.decode_url + "/health", process=cls.process_decode)
         cls.launch_lb()
 
@@ -333,9 +326,7 @@ class TestNpuEPDDisaggregationOmni(NpuEPDBase):
             {"type": "image_url", "image_url": {"url": _INLINE_IMAGE_URL}},
             {"type": "text", "text": "Describe this image in a sentence."},
         ]
-        text = _chat_completion(
-            self.lb_url, self.model, content, temperature=0, max_tokens=256
-        )
+        text = _chat_completion(self.lb_url, self.model, content, temperature=0, max_tokens=256)
         print(f"[Omni EPD] Image response: {text}")
         self.assertGreater(len(text), 0)
 
@@ -470,12 +461,8 @@ class TestNpuEPDDisaggregationQwen35(NpuEPDBase):
         )
         cls.process_encode = cls.start_encode()
         cls.start_prefill()
-        cls.wait_server_ready(
-            cls.encode_url + "/health", process=cls.process_encode
-        )
-        cls.wait_server_ready(
-            cls.language_url + "/health", process=cls.process_prefill
-        )
+        cls.wait_server_ready(cls.encode_url + "/health", process=cls.process_encode)
+        cls.wait_server_ready(cls.language_url + "/health", process=cls.process_prefill)
 
     @classmethod
     def start_encode(cls, port=None, base_gpu_id=None):
@@ -632,12 +619,8 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
         )
 
         # Start two encode servers in parallel (NPU 0 and NPU 2 base).
-        t1 = threading.Thread(
-            target=cls._start_encode1, args=(cls.encode_port1, 0)
-        )
-        t2 = threading.Thread(
-            target=cls._start_encode2, args=(cls.encode_port2, 2)
-        )
+        t1 = threading.Thread(target=cls._start_encode1, args=(cls.encode_port1, 0))
+        t2 = threading.Thread(target=cls._start_encode2, args=(cls.encode_port2, 2))
         t1.start()
         t2.start()
         t1.join()
@@ -651,15 +634,9 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
         tp.join()
         td.join()
 
-        cls.wait_server_ready(
-            cls.encode_url1 + "/health", process=cls.process_encode1
-        )
-        cls.wait_server_ready(
-            cls.encode_url2 + "/health", process=cls.process_encode2
-        )
-        cls.wait_server_ready(
-            cls.prefill_url + "/health", process=cls.process_prefill
-        )
+        cls.wait_server_ready(cls.encode_url1 + "/health", process=cls.process_encode1)
+        cls.wait_server_ready(cls.encode_url2 + "/health", process=cls.process_encode2)
+        cls.wait_server_ready(cls.prefill_url + "/health", process=cls.process_prefill)
         cls.wait_server_ready(cls.decode_url + "/health", process=cls.process_decode)
         cls.launch_lb()
 
