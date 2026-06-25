@@ -215,6 +215,7 @@ class NpuEPDBase(PDDisaggregationServerBase):
             "--port",
             cls.prefill_port,
         ]
+        prefill_args += cls.transfer_backend + cls.rdma_devices
         prefill_args += NPU_COMMON_ARGS
         cls.process_prefill = popen_launch_server(
             cls.model,
@@ -238,6 +239,7 @@ class NpuEPDBase(PDDisaggregationServerBase):
             "--port",
             cls.decode_port,
         ]
+        decode_args += cls.transfer_backend + cls.rdma_devices
         decode_args += NPU_COMMON_ARGS
         cls.process_decode = popen_launch_server(
             cls.model,
@@ -705,6 +707,7 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
             "--port",
             cls.prefill_port,
         ]
+        prefill_args += cls.transfer_backend + cls.rdma_devices
         prefill_args += NPU_COMMON_ARGS
         cls.process_prefill = popen_launch_server(
             cls.model,
