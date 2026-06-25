@@ -372,6 +372,10 @@ FR_SPEC_TOKEN_MAP_PATH = "/root/.cache/sglang/FR-Spec/freq_32768.pt"
 CONFIG_YAML_PATH = (
     "/__w/sglang/sglang/test/registered/ascend/basic_function/config/config.yaml"
 )
+# Speech Recognition Model
+WHISPER_LARGE_V3_WEIGHTS_PATH = os.path.join(
+    MODEL_WEIGHTS_DIR, "openai-mirror/whisper-large-v3"
+)
 
 
 class ModelTestConfig(NamedTuple):
