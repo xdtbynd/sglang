@@ -114,11 +114,15 @@ def _chat_completion(base_url: str, model: str, content: list, **kwargs) -> str:
         "messages": [{"role": "user", "content": content}],
     }
     payload.update(kwargs)
-    resp = requests.post(f"{base_url}/v1/chat/completions", json=payload, timeout=300)
+    resp = requests.post(
+        f"{base_url}/v1/chat/completions", json=payload, timeout=300
+    )
     assert (
         resp.status_code == 200
     ), f"Request failed {resp.status_code}: {resp.text[:300]}"
-    return resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+    return (
+        resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+    )
 
 
 class NpuEPDBase(PDDisaggregationServerBase):
@@ -141,6 +145,14 @@ class NpuEPDBase(PDDisaggregationServerBase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Override the PD-disaggregation transfer backend inherited from
+        # ``PDDisaggregationServerBase``: in CI the base class forces
+        # ``--disaggregation-transfer-backend mooncake`` (GPU/RDMA-only),
+        # which fails on NPU with ``ModuleNotFoundError: No module named
+        # 'mooncake'``.  NPU PD disaggregation uses the default backend
+        # (no explicit --disaggregation-transfer-backend flag).
+        cls.transfer_backend = []
+        cls.rdma_devices = []
         parsed = urlparse(DEFAULT_URL_FOR_TEST)
         cls.base_host = parsed.hostname
         bp = int(parsed.port)
@@ -250,7 +262,9 @@ class NpuEPDBase(PDDisaggregationServerBase):
         t_prefill.join()
         t_decode.join()
         cls.wait_server_ready(cls.encode_url + "/health", process=cls.process_encode)
-        cls.wait_server_ready(cls.prefill_url + "/health", process=cls.process_prefill)
+        cls.wait_server_ready(
+            cls.prefill_url + "/health", process=cls.process_prefill
+        )
         cls.wait_server_ready(cls.decode_url + "/health", process=cls.process_decode)
         cls.launch_lb()
 
@@ -456,8 +470,12 @@ class TestNpuEPDDisaggregationQwen35(NpuEPDBase):
         )
         cls.process_encode = cls.start_encode()
         cls.start_prefill()
-        cls.wait_server_ready(cls.encode_url + "/health", process=cls.process_encode)
-        cls.wait_server_ready(cls.language_url + "/health", process=cls.process_prefill)
+        cls.wait_server_ready(
+            cls.encode_url + "/health", process=cls.process_encode
+        )
+        cls.wait_server_ready(
+            cls.language_url + "/health", process=cls.process_prefill
+        )
 
     @classmethod
     def start_encode(cls, port=None, base_gpu_id=None):
@@ -582,16 +600,22 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
     """EPD test with multiple encode servers for load balancing (CI runs).
 
     GPU original (TestEPDDisaggregationMultiEncoders) starts two encode servers
-    on GPU 0/1 (TP=1 each) and runs MMMU, fitting in 4 GPUs (encode1=GPU0,
-    encode2=GPU1, prefill=GPU2, decode=GPU3).  On NPU we mirror this layout
-    with TP=1: encode1=NPU0, encode2=NPU1, prefill=NPU2, decode=NPU3.  The
-    small Qwen2.5-VL-3B model fits on a single NPU (61 GiB) at TP=1.
+    on GPU 0/1 and runs MMMU.  On NPU we start two encode servers on NPU 0 and
+    NPU 2 (each encoder uses TP=2, so encode1 occupies NPU 0-1 and encode2
+    occupies NPU 2-3).  Prefill uses NPU 0-1 and decode uses NPU 2-3 via
+    ``--base-gpu-id``.
+
+    NOTE: The NPU runner has 4 NPUs total.  Because each encoder/language
+    server uses TP=2, the two encoders cannot both occupy NPU 0-1 simultaneously
+    with the prefill server.  To fit in 4 NPUs we let encode1 + prefill share
+    NPU 0-1 and encode2 + decode share NPU 2-3 (encode is encoder-only and
+    prefill is language-only, so they can co-locate on the same NPUs via
+    different processes).
     """
 
     # Qwen2.5-VL-3B-Instruct scores ~0.40 on the 50-sample MMMU subset.
     accuracy = 0.40
     mmmu_args = ["--limit", "50"]
-    tp_size = "1"  # TP=1 so all 4 servers fit on 4 NPUs (one server per NPU).
 
     @classmethod
     def setUpClass(cls):
@@ -607,9 +631,13 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
             f"prefill={cls.prefill_port}, decode={cls.decode_port}"
         )
 
-        # Start two encode servers in parallel (encode1=NPU0, encode2=NPU1).
-        t1 = threading.Thread(target=cls._start_encode1, args=(cls.encode_port1, 0))
-        t2 = threading.Thread(target=cls._start_encode2, args=(cls.encode_port2, 1))
+        # Start two encode servers in parallel (NPU 0 and NPU 2 base).
+        t1 = threading.Thread(
+            target=cls._start_encode1, args=(cls.encode_port1, 0)
+        )
+        t2 = threading.Thread(
+            target=cls._start_encode2, args=(cls.encode_port2, 2)
+        )
         t1.start()
         t2.start()
         t1.join()
@@ -623,9 +651,15 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
         tp.join()
         td.join()
 
-        cls.wait_server_ready(cls.encode_url1 + "/health", process=cls.process_encode1)
-        cls.wait_server_ready(cls.encode_url2 + "/health", process=cls.process_encode2)
-        cls.wait_server_ready(cls.prefill_url + "/health", process=cls.process_prefill)
+        cls.wait_server_ready(
+            cls.encode_url1 + "/health", process=cls.process_encode1
+        )
+        cls.wait_server_ready(
+            cls.encode_url2 + "/health", process=cls.process_encode2
+        )
+        cls.wait_server_ready(
+            cls.prefill_url + "/health", process=cls.process_prefill
+        )
         cls.wait_server_ready(cls.decode_url + "/health", process=cls.process_decode)
         cls.launch_lb()
 
@@ -675,7 +709,7 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
 
     @classmethod
     def start_prefill(cls, encoder_urls=None):
-        """Start prefill on NPU 2 pointing at BOTH encoder URLs (load balancing)."""
+        """Start prefill pointing at BOTH encoder URLs (load balancing)."""
         encoder_urls = f"{cls.encode_url1},{cls.encode_url2}"
         prefill_args = [
             "--language-only",
@@ -690,7 +724,7 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
             "--tp",
             cls.tp_size,
             "--base-gpu-id",
-            "2",
+            "1",
             "--port",
             cls.prefill_port,
         ]
@@ -700,29 +734,6 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
             base_url=cls.prefill_url,
             timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
             other_args=prefill_args,
-        )
-
-    @classmethod
-    def start_decode(cls):
-        """Start decode on NPU 3."""
-        decode_args = [
-            "--disaggregation-mode",
-            "decode",
-            "--disaggregation-bootstrap-port",
-            cls.bootstrap_port,
-            "--tp",
-            cls.tp_size,
-            "--base-gpu-id",
-            "3",
-            "--port",
-            cls.decode_port,
-        ]
-        decode_args += NPU_COMMON_ARGS
-        cls.process_decode = popen_launch_server(
-            cls.model,
-            base_url=cls.decode_url,
-            timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
-            other_args=decode_args,
         )
 
     @classmethod
