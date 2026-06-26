@@ -29,9 +29,10 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          pip install datasets evaluate
+          pip install datasets==2.16.1 evaluate>=0.4.0
           pip install sentence_transformers pycocoevalcap
           pip install yt-dlp sentencepiece==0.1.99 nltk av ftfy sqlitedict==2.1.0 sacrebleu>=1.5.0 peft>=0.2.0 accelerate>=0.29.1
+          pip install pytz jsonlines numexpr pybind11 pytablewriter scikit-learn timm einops openai opencv-python-headless hf_transfer tqdm-multiprocess transformers
           git clone --branch v0.3.3 --depth 1 https://github.com/EvolvingLMMs-Lab/lmms-eval.git
 
       - name: Run test
