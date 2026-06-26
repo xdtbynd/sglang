@@ -53,7 +53,6 @@ NPU adaptation notes (see report for the full rationale):
     runtime or skip the test with a clear reason in a follow-up commit.
 """
 
-import os
 import unittest
 from types import SimpleNamespace
 
