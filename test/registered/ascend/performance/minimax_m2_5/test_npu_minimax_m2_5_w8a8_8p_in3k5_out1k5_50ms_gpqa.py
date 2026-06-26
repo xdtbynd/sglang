@@ -57,7 +57,7 @@ MINIMAX_M2_5_HIGH_THROUGHPUT_OTHER_ARGS = [
     "--enable-prefill-delayer",
     "--chunked-prefill-size",
     -1,
-    "--max-prefill-token",
+    "--max-prefill-tokens",
     8192,
     "--cuda-graph-bs",
     1,
