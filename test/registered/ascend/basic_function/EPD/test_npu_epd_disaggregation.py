@@ -54,6 +54,7 @@ from sglang.test.test_utils import (
     DEFAULT_URL_FOR_TEST,
     is_in_ci,
     popen_launch_server,
+    popen_with_error_check,
 )
 
 # NPU common server arguments shared by all server roles.
@@ -266,6 +267,36 @@ class NpuEPDBase(PDDisaggregationServerBase):
             other_args=decode_args,
             env=NPU_ENV,
         )
+
+    @classmethod
+    def launch_lb(cls):
+        """Launch the load balancer with NPU-compatible arguments.
+
+        Overrides the base class launch_lb which uses GPU-specific args:
+        - Removes --mini-lb (not supported by NPU router).
+        - Passes bootstrap_port as the second value to --prefill (required by
+          the NPU ascend transfer backend to connect prefill/decode).
+        """
+        import shlex
+
+        lb_command = [
+            "python3",
+            "-m",
+            "sglang_router.launch_router",
+            "--pd-disaggregation",
+            "--prefill",
+            cls.prefill_url,
+            cls.bootstrap_port,
+            "--decode",
+            cls.decode_url,
+            "--host",
+            cls.base_host,
+            "--port",
+            cls.lb_port,
+        ]
+        print("Starting load balancer:", shlex.join(lb_command))
+        cls.process_lb = popen_with_error_check(lb_command)
+        cls.wait_server_ready(cls.lb_url + "/health", process=cls.process_lb)
 
     @classmethod
     def start_all_servers(cls):
@@ -720,11 +751,11 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
         Uses NPU 4-5 (base-gpu-id=4) to avoid OOM: encode1 occupies NPU 0-1,
         encode2 occupies NPU 2-3, so prefill must use NPU 4-5.
         """
-        encoder_urls = f"{cls.encode_url1},{cls.encode_url2}"
         prefill_args = [
             "--language-only",
             "--encoder-urls",
-            encoder_urls,
+            cls.encode_url1,
+            cls.encode_url2,
             "--encoder-transfer-backend",
             cls.encoder_transfer_backend,
             "--disaggregation-mode",
