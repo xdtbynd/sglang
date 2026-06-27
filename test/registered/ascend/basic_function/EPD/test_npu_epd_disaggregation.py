@@ -626,7 +626,7 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, NpuEPDBase):
 
     # Qwen2.5-VL-3B-Instruct scores ~0.40 on the 50-sample MMMU subset.
     accuracy = 0.40
-    mmmu_args = ["--limit", "50"]
+    mmmu_args = ["--limit", "50", "--batch_size", "4"]
 
     @classmethod
     def setUpClass(cls):
