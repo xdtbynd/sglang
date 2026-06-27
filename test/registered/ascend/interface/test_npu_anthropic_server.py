@@ -21,6 +21,7 @@ register_npu_ci(est_time=100, suite="full-1-npu-a3", nightly=True)
 
 class TestAnthropicServer(CustomTestCase):
     """Test Anthropic Claude Compatible Interface"""
+
     @classmethod
     def setUpClass(cls):
         cls.model = QWEN3_0_6B_WEIGHTS_PATH
