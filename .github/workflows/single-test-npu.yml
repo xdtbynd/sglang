@@ -55,7 +55,7 @@ jobs:
           export PIP_INDEX_URL=https://repo.huaweicloud.com/repository/pypi/simple
           export PIP_TRUSTED_HOST=repo.huaweicloud.com
           nohup pip install --retries 10 --timeout 300 . > lmmslog.txt 2>&1 &
-          sleep 120
+          sleep 60
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           cd ..
 
