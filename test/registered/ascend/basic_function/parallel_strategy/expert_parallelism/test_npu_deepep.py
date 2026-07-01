@@ -17,7 +17,7 @@ register_npu_ci(est_time=400, suite="stage-b-test-16-npu-a3", nightly=False)
 register_npu_ci(est_time=400, suite="full-16-npu-a3", nightly=True)
 
 TEST_MODEL_MATRIX = {
-    DEEPSEEK_R1_0528_W8A8_WEIGHTS_PATH :{
+    DEEPSEEK_R1_0528_W8A8_WEIGHTS_PATH: {
         "accuracy": 0.95,
         "latency": 1000,
         "output_throughput": 6,
