@@ -108,7 +108,7 @@ RUN mkdir cann-custom-ops && \
     ./CANN-custom_ops-none-linux.$(arch).run --install-path=/usr/local/Ascend/cann-${DEVICE_TYPE}/opp && \
     ./cann-ops-transformer-custom_linux-$(arch).run --install-path=/usr/local/Ascend/cann-${DEVICE_TYPE}/opp && \
     ${PIP_INSTALL} custom_ops-1.0-cp311-cp311-linux_$(arch).whl && \
-    && cd .. && rm -rf cann-custom-ops
+    cd .. && rm -rf cann-custom-ops
 
 # Install Deep-ep
 # pin wheel to 0.45.1 ref: https://github.com/pypa/wheel/issues/662
