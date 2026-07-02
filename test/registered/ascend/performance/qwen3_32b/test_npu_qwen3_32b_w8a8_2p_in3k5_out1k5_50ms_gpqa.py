@@ -103,6 +103,7 @@ class TestQwen32B(TestAscendPerformanceTestCaseBase):
     input_len = 3584
     output_len = 1536
     random_range_ratio = 1
+    seed = 1
     tpot = 50
     output_token_throughput = 1600
 
@@ -111,6 +112,7 @@ class TestQwen32B(TestAscendPerformanceTestCaseBase):
 
 
 class TestQwen32B_mmlupro(TestAscendAccuracyTestCaseBase):
+    seed = 1
     model = QWEN3_32B_W8A8_MODEL_PATH
     envs = QWEN3_32B_ENVS
     other_args = QWEN3_32B_OTHER_ARGS
