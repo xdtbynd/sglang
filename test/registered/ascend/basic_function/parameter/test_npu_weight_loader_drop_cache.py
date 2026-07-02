@@ -33,22 +33,28 @@ _COMMON_ARGS = [
 
 
 def _vmtouch_file(filepath):
-    """Run vmtouch and return (resident_pages, raw_stdout, raw_stderr)."""
+    """Run vmtouch and return (resident_pages, percentage, raw_stdout, raw_stderr).
+    Format: Resident Pages: 910157/968961 36/36 93.9%
+    """
     try:
         result = subprocess.run(
-            ["vmtouch", "-v", filepath],
+            ["vmtouch", filepath],
             capture_output=True, text=True, timeout=30,
         )
         stdout = result.stdout
         stderr = result.stderr
         resident = -1
+        pct = ""
         for line in stdout.split("\n"):
             if "Resident Pages" in line:
-                resident = int(line.strip().split()[0])
+                # Parse: " Resident Pages: 910157/968961 36/36 93.9%"
+                parts = line.split("Resident Pages:")[1].strip().split()
+                resident = int(parts[0].split("/")[0])
+                pct = parts[2] if len(parts) >= 3 else ""
                 break
-        return resident, stdout, stderr
+        return resident, pct, stdout, stderr
     except Exception as e:
-        return -1, "", str(e)
+        return -1, "", "", str(e)
 
 
 def _print_vmtouch(safetensor_files, weight_dir, label):
@@ -56,15 +62,16 @@ def _print_vmtouch(safetensor_files, weight_dir, label):
     print(f"\n=== vmtouch {label} ===")
     for fname in safetensor_files:
         fpath = os.path.join(weight_dir, fname)
-        resident, stdout, stderr = _vmtouch_file(fpath)
+        resident, pct, stdout, stderr = _vmtouch_file(fpath)
         if resident >= 0:
-            print(f"vmtouch: {fname} Resident Pages={resident}")
+            print(f"vmtouch: {fname} Resident Pages={resident} ({pct})")
         else:
             print(f"vmtouch: {fname} FAILED stderr={stderr[:200]}")
-        # Print first few lines of vmtouch output for debugging
-        for line in stdout.split("\n")[:3]:
-            if line.strip():
-                print(f"  {line.strip()}")
+            # Print raw vmtouch output for debugging
+            if stdout:
+                for line in stdout.split("\n")[:5]:
+                    if line.strip():
+                        print(f"  DEBUG: {line.strip()}")
     print(f"=== end vmtouch {label} ===\n")
 
 
