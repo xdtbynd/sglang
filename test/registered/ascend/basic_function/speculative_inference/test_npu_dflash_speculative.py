@@ -19,6 +19,7 @@ import requests
 from sglang.srt.utils import kill_process_tree
 from sglang.test.ascend.test_ascend_utils import (
     QWEN3_8B_DFLASH_B16_WEIGHTS_PATH,
+    QWEN3_8B_WEIGHTS_PATH,
     logger,
 )
 from sglang.test.ci.ci_register import register_npu_ci
@@ -63,7 +64,7 @@ class TestNPUDFlashSpeculative(CustomTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = QWEN3_8B_DFLASH_B16_WEIGHTS_PATH
+        cls.model = QWEN3_8B_WEIGHTS_PATH
         cls.draft_model = QWEN3_8B_DFLASH_B16_WEIGHTS_PATH
         cls.base_url = DEFAULT_URL_FOR_TEST
 
@@ -119,18 +120,23 @@ class TestNPUDFlashSpeculative(CustomTestCase):
         self.assertEqual(resp.status_code, 200)
         info = resp.json()
 
-        logger.info("Server info: %s", {
-            k: info.get(k) for k in [
-                "speculative_algorithm",
-                "speculative_dflash_block_size",
-                "speculative_num_steps",
-                "speculative_num_draft_tokens",
-            ]
-        })
+        logger.info(
+            "Server info: %s",
+            {
+                k: info.get(k)
+                for k in [
+                    "speculative_algorithm",
+                    "speculative_dflash_block_size",
+                    "speculative_num_steps",
+                    "speculative_num_draft_tokens",
+                ]
+            },
+        )
 
         self.assertEqual(
-            info.get("speculative_algorithm"), "DFLASH",
-            "speculative_algorithm should be DFLASH"
+            info.get("speculative_algorithm"),
+            "DFLASH",
+            "speculative_algorithm should be DFLASH",
         )
 
     def test_b_basic_inference(self):
@@ -161,9 +167,7 @@ class TestNPUDFlashSpeculative(CustomTestCase):
 
         logger.info("GSM8K metrics: %s", metrics)
 
-        server_info = requests.get(
-            self.base_url + "/server_info", timeout=30
-        ).json()
+        server_info = requests.get(self.base_url + "/server_info", timeout=30).json()
         avg_spec_accept_length = None
         if "internal_states" in server_info and len(server_info["internal_states"]) > 0:
             internal_state = server_info["internal_states"][0]
@@ -179,12 +183,12 @@ class TestNPUDFlashSpeculative(CustomTestCase):
                 f"{avg_spec_accept_length=}\n"
             )
 
-        self.assertGreater(metrics["score"], 0.69,
-                           "GSM8K score should be > 0.69")
+        self.assertGreater(metrics["score"], 0.69, "GSM8K score should be > 0.69")
         if avg_spec_accept_length is not None:
             self.assertGreater(
-                avg_spec_accept_length, 1.0,
-                "avg_spec_accept_length should be > 1.0 for DFLASH to be beneficial"
+                avg_spec_accept_length,
+                1.0,
+                "avg_spec_accept_length should be > 1.0 for DFLASH to be beneficial",
             )
 
 

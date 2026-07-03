@@ -136,9 +136,7 @@ class TestNPUSkipDPMLPSyncPositive(CustomTestCase):
         metrics = run_eval(args)
         logger.info("GSM8K metrics (skip-dp-mlp-sync): %s", metrics)
 
-        server_info = requests.get(
-            self.base_url + "/server_info", timeout=30
-        ).json()
+        server_info = requests.get(self.base_url + "/server_info", timeout=30).json()
         avg_spec_accept_length = None
         if "internal_states" in server_info and len(server_info["internal_states"]) > 0:
             internal_state = server_info["internal_states"][0]
@@ -155,8 +153,7 @@ class TestNPUSkipDPMLPSyncPositive(CustomTestCase):
             )
 
         self.assertGreater(
-            metrics["score"], 0.69,
-            "GSM8K score should be > 0.69 with skip-dp-mlp-sync"
+            metrics["score"], 0.69, "GSM8K score should be > 0.69 with skip-dp-mlp-sync"
         )
 
 
@@ -184,23 +181,36 @@ class TestNPUSkipDPMLPSyncNegative(unittest.TestCase):
         env = {**NPU_ENV, "ASCEND_RT_VISIBLE_DEVICES": "0,1"}
 
         cmd = [
-            sys.executable, "-m", "sglang.launch_server",
-            "--model-path", self.model,
+            sys.executable,
+            "-m",
+            "sglang.launch_server",
+            "--model-path",
+            self.model,
             "--trust-remote-code",
-            "--attention-backend", "ascend",
+            "--attention-backend",
+            "ascend",
             "--disable-cuda-graph",
-            "--mem-fraction-static", "0.7",
-            "--tp-size", "2",
-            "--dp-size", "2",
+            "--mem-fraction-static",
+            "0.7",
+            "--tp-size",
+            "2",
+            "--dp-size",
+            "2",
             "--enable-dp-attention",
             "--enable-dp-lm-head",
-            "--moe-dense-tp-size", "1",
-            "--speculative-algorithm", "DFLASH",
-            "--speculative-draft-model-path", self.model,
-            "--speculative-dflash-block-size", "16",
+            "--moe-dense-tp-size",
+            "1",
+            "--speculative-algorithm",
+            "DFLASH",
+            "--speculative-draft-model-path",
+            self.model,
+            "--speculative-dflash-block-size",
+            "16",
             "--speculative-skip-dp-mlp-sync",
-            "--host", "127.0.0.1",
-            "--port", "39999",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "39999",
         ]
 
         logger.info("Command: %s", " ".join(cmd))
@@ -220,8 +230,9 @@ class TestNPUSkipDPMLPSyncNegative(unittest.TestCase):
 
         # Server should have crashed (non-zero exit)
         self.assertNotEqual(
-            result.returncode, 0,
-            "Server should have crashed with Assert error for non-EAGLE + skip-dp-mlp-sync"
+            result.returncode,
+            0,
+            "Server should have crashed with Assert error for non-EAGLE + skip-dp-mlp-sync",
         )
 
         # Verify the expected Assert message is present
@@ -243,7 +254,7 @@ class TestNPUSkipDPMLPSyncNegative(unittest.TestCase):
             found,
             f"Expected Assert message about skip_dp_mlp_sync not found in output. "
             f"Possible messages: {possible_messages}. "
-            f"Output (last 2000 chars): {combined_output[-2000:]}"
+            f"Output (last 2000 chars): {combined_output[-2000:]}",
         )
 
         logger.info("Negative test passed: Assert correctly intercepted.")

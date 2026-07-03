@@ -158,8 +158,9 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
         # Verify upshift
         num_steps = self._get_speculative_num_steps()
         self.assertEqual(
-            num_steps, 3,
-            f"Expected speculative_num_steps=3 after upshift, got {num_steps}"
+            num_steps,
+            3,
+            f"Expected speculative_num_steps=3 after upshift, got {num_steps}",
         )
         logger.info("Upshift verified: speculative_num_steps=3")
         return {"speculative_num_steps": num_steps}
@@ -191,8 +192,9 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
         # Verify downshift
         num_steps = self._get_speculative_num_steps()
         self.assertEqual(
-            num_steps, 1,
-            f"Expected speculative_num_steps=1 after downshift, got {num_steps}"
+            num_steps,
+            1,
+            f"Expected speculative_num_steps=1 after downshift, got {num_steps}",
         )
         logger.info("Downshift verified: speculative_num_steps=1")
         return {"speculative_num_steps": num_steps}
@@ -233,8 +235,9 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
 
         # NPU uses stricter threshold (0.69) than GPU (0.20)
         self.assertGreater(
-            metrics["score"], 0.69,
-            "GSM8K score should be > 0.69 after adaptive switches"
+            metrics["score"],
+            0.69,
+            "GSM8K score should be > 0.69 after adaptive switches",
         )
 
 

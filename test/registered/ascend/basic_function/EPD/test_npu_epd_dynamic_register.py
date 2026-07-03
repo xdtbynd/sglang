@@ -168,11 +168,10 @@ class TestNPUEPDDynamicRegister(CustomTestCase):
         """Verify both language and encoder servers are healthy."""
         self.assertTrue(
             self._wait_for_health(self.language_url),
-            "Language server should be healthy"
+            "Language server should be healthy",
         )
         self.assertTrue(
-            self._wait_for_health(self.encoder_url),
-            "Encoder server should be healthy"
+            self._wait_for_health(self.encoder_url), "Encoder server should be healthy"
         )
         logger.info("Both servers are healthy.")
 
@@ -186,9 +185,7 @@ class TestNPUEPDDynamicRegister(CustomTestCase):
 
     def test_b_encoder_registered(self):
         """Verify encoder is registered in language server."""
-        resp = requests.get(
-            self.language_url + "/list_encoder_urls", timeout=30
-        )
+        resp = requests.get(self.language_url + "/list_encoder_urls", timeout=30)
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
 
@@ -196,9 +193,11 @@ class TestNPUEPDDynamicRegister(CustomTestCase):
 
         encoder_urls = data if isinstance(data, list) else data.get("encoder_urls", [])
         self.assertTrue(
-            any(ENCODER_SERVER_URL in url or str(ENCODER_SERVER_PORT) in url
-                for url in encoder_urls),
-            f"Encoder URL should be registered. Got: {encoder_urls}"
+            any(
+                ENCODER_SERVER_URL in url or str(ENCODER_SERVER_PORT) in url
+                for url in encoder_urls
+            ),
+            f"Encoder URL should be registered. Got: {encoder_urls}",
         )
         logger.info("Encoder is registered in language server.")
 
@@ -252,18 +251,13 @@ class TestNPUEPDDynamicRegister(CustomTestCase):
 
         # Check /list_encoder_urls no longer contains encoder
         try:
-            resp = requests.get(
-                self.language_url + "/list_encoder_urls", timeout=30
-            )
+            resp = requests.get(self.language_url + "/list_encoder_urls", timeout=30)
             if resp.status_code == 200:
                 data = resp.json()
                 encoder_urls = (
-                    data if isinstance(data, list)
-                    else data.get("encoder_urls", [])
+                    data if isinstance(data, list) else data.get("encoder_urls", [])
                 )
-                logger.info(
-                    "Encoder URLs after encoder stopped: %s", encoder_urls
-                )
+                logger.info("Encoder URLs after encoder stopped: %s", encoder_urls)
         except Exception as e:
             logger.info("Could not query /list_encoder_urls: %s", e)
 
@@ -304,24 +298,22 @@ class TestNPUEPDDynamicRegister(CustomTestCase):
 
         self.assertTrue(
             self._wait_for_health(self.encoder_url),
-            "Encoder server should be healthy after restart"
+            "Encoder server should be healthy after restart",
         )
 
         # Verify re-registration
-        resp = requests.get(
-            self.language_url + "/list_encoder_urls", timeout=30
-        )
+        resp = requests.get(self.language_url + "/list_encoder_urls", timeout=30)
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        encoder_urls = (
-            data if isinstance(data, list) else data.get("encoder_urls", [])
-        )
+        encoder_urls = data if isinstance(data, list) else data.get("encoder_urls", [])
         logger.info("Encoder URLs after re-register: %s", encoder_urls)
 
         self.assertTrue(
-            any(ENCODER_SERVER_URL in url or str(ENCODER_SERVER_PORT) in url
-                for url in encoder_urls),
-            f"Encoder URL should be re-registered. Got: {encoder_urls}"
+            any(
+                ENCODER_SERVER_URL in url or str(ENCODER_SERVER_PORT) in url
+                for url in encoder_urls
+            ),
+            f"Encoder URL should be re-registered. Got: {encoder_urls}",
         )
         logger.info("Encoder successfully re-registered.")
 
