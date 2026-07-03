@@ -67,7 +67,6 @@ def _print_vmtouch(safetensor_files, weight_dir, label):
             print(f"vmtouch: {fname} Resident Pages={resident} ({pct})")
         else:
             print(f"vmtouch: {fname} FAILED stderr={stderr[:200]}")
-            # Print raw vmtouch output for debugging
             if stdout:
                 for line in stdout.split("\n")[:5]:
                     if line.strip():
@@ -76,8 +75,9 @@ def _print_vmtouch(safetensor_files, weight_dir, label):
 
 
 class TestWeightLoaderDropCache(CustomTestCase):
-    """--weight-loader-drop-cache-after-load — verify page cache is released
-    after loading with vmtouch.
+    """--weight-loader-drop-cache-after-load — verify page cache after
+    drop-cache.  vmtouch runs AFTER server shutdown so posix_fadvise
+    can actually release pages.
 
     [Test Category] Parameter
     [Test Target] --weight-loader-drop-cache-after-load
@@ -109,16 +109,18 @@ class TestWeightLoaderDropCache(CustomTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        kill_process_tree(cls.process.pid)
+        # Process already killed in test method; safe to call again
+        try:
+            kill_process_tree(cls.process.pid)
+        except Exception:
+            pass
         cls.out_file.close()
         cls.err_file.close()
         os.unlink(cls.out_file.name)
         os.unlink(cls.err_file.name)
 
     def test_drop_cache_after_load(self):
-        """Launch with drop-cache-after-load, then inspect page cache via vmtouch."""
-
-        # Server must be healthy and able to generate
+        """Shutdown server, then inspect page cache via vmtouch."""
         resp = requests.get(self.base_url + "/health", timeout=30)
         self.assertEqual(resp.status_code, 200)
 
@@ -132,6 +134,9 @@ class TestWeightLoaderDropCache(CustomTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("text", resp.json())
 
+        # Shutdown first so fadvise can release pages
+        kill_process_tree(self.process.pid)
+
         weight_dir = QWEN3_8B_WEIGHTS_PATH
         safetensor_files = sorted(
             f for f in os.listdir(weight_dir) if f.endswith(".safetensors")
@@ -141,7 +146,8 @@ class TestWeightLoaderDropCache(CustomTestCase):
 
 class TestWeightLoaderDropCacheOff(CustomTestCase):
     """Default (no drop-cache) — baseline for comparing page cache with
-    TestWeightLoaderDropCache.
+    TestWeightLoaderDropCache.  vmtouch runs after server shutdown for
+    a fair comparison.
 
     [Test Category] Parameter
     [Test Target] --weight-loader-drop-cache-after-load (off, baseline)
@@ -172,15 +178,17 @@ class TestWeightLoaderDropCacheOff(CustomTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        kill_process_tree(cls.process.pid)
+        try:
+            kill_process_tree(cls.process.pid)
+        except Exception:
+            pass
         cls.out_file.close()
         cls.err_file.close()
         os.unlink(cls.out_file.name)
         os.unlink(cls.err_file.name)
 
     def test_drop_cache_off_baseline(self):
-        """Launch without drop-cache, then inspect page cache via vmtouch."""
-
+        """Shutdown server, then inspect page cache via vmtouch."""
         resp = requests.get(self.base_url + "/health", timeout=30)
         self.assertEqual(resp.status_code, 200)
 
@@ -193,6 +201,9 @@ class TestWeightLoaderDropCacheOff(CustomTestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertIn("text", resp.json())
+
+        # Shutdown first for fair comparison
+        kill_process_tree(self.process.pid)
 
         weight_dir = QWEN3_8B_WEIGHTS_PATH
         safetensor_files = sorted(
