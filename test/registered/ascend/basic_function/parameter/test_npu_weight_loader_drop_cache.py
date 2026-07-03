@@ -120,10 +120,7 @@ class TestWeightLoaderDropCache(CustomTestCase):
         os.unlink(cls.err_file.name)
 
     def test_drop_cache_after_load(self):
-        """Drop caches, launch with drop-cache-after-load, then check vmtouch."""
-        # Drop system page cache first for a clean start
-        subprocess.run(["sh", "-c", "sync && echo 3 > /proc/sys/vm/drop_caches"])
-
+        """Launch with drop-cache-after-load, flush_cache, then check vmtouch."""
         resp = requests.get(self.base_url + "/health", timeout=30)
         self.assertEqual(resp.status_code, 200)
 
@@ -137,7 +134,8 @@ class TestWeightLoaderDropCache(CustomTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("text", resp.json())
 
-        # Shutdown first so fadvise can release pages
+        # Flush cache to release radix tree pages, then shutdown
+        requests.post(self.base_url + "/flush_cache", timeout=10)
         kill_process_tree(self.process.pid)
 
         weight_dir = QWEN3_8B_WEIGHTS_PATH
@@ -191,10 +189,7 @@ class TestWeightLoaderDropCacheOff(CustomTestCase):
         os.unlink(cls.err_file.name)
 
     def test_drop_cache_off_baseline(self):
-        """Drop caches, launch without drop-cache, then check vmtouch."""
-        # Drop system page cache first for a clean start
-        subprocess.run(["sh", "-c", "sync && echo 3 > /proc/sys/vm/drop_caches"])
-
+        """Launch without drop-cache, flush_cache, then check vmtouch."""
         resp = requests.get(self.base_url + "/health", timeout=30)
         self.assertEqual(resp.status_code, 200)
 
@@ -208,7 +203,8 @@ class TestWeightLoaderDropCacheOff(CustomTestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("text", resp.json())
 
-        # Shutdown first for fair comparison
+        # Flush cache to release radix tree pages, then shutdown
+        requests.post(self.base_url + "/flush_cache", timeout=10)
         kill_process_tree(self.process.pid)
 
         weight_dir = QWEN3_8B_WEIGHTS_PATH
