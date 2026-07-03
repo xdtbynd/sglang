@@ -131,6 +131,14 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
         logger.info("Current speculative_num_steps: %s", num_steps)
         return num_steps
 
+    def _send_one_prompt(self):
+        """Send one prompt via send_one_prompt with correct BenchArgs."""
+        from urllib.parse import urlparse
+
+        parsed = urlparse(self.base_url)
+        args = BenchArgs(host=parsed.hostname, port=parsed.port)
+        send_one_prompt(args, print_output=False)
+
     def _drive_upshift(self):
         """Drive the system to upshift (increase speculative_num_steps).
 
@@ -150,9 +158,8 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
         logger.info("Set speculative_num_steps=3 via /set_args")
 
         # Send prompts to trigger adaptive upshift
-        args = BenchArgs(base_url=self.base_url, model=self.model)
         for i in range(5):
-            send_one_prompt(args)
+            self._send_one_prompt()
             logger.info("Sent prompt %d/5 for upshift", i + 1)
 
         # Verify upshift
@@ -184,9 +191,8 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
         logger.info("Set speculative_num_steps=1 via /set_args")
 
         # Send prompts to trigger adaptive downshift
-        args = BenchArgs(base_url=self.base_url, model=self.model)
         for i in range(5):
-            send_one_prompt(args)
+            self._send_one_prompt()
             logger.info("Sent prompt %d/5 for downshift", i + 1)
 
         # Verify downshift
