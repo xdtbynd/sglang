@@ -120,7 +120,10 @@ class TestWeightLoaderDropCache(CustomTestCase):
         os.unlink(cls.err_file.name)
 
     def test_drop_cache_after_load(self):
-        """Shutdown server, then inspect page cache via vmtouch."""
+        """Drop caches, launch with drop-cache-after-load, then check vmtouch."""
+        # Drop system page cache first for a clean start
+        subprocess.run(["sh", "-c", "sync && echo 3 > /proc/sys/vm/drop_caches"])
+
         resp = requests.get(self.base_url + "/health", timeout=30)
         self.assertEqual(resp.status_code, 200)
 
@@ -188,7 +191,10 @@ class TestWeightLoaderDropCacheOff(CustomTestCase):
         os.unlink(cls.err_file.name)
 
     def test_drop_cache_off_baseline(self):
-        """Shutdown server, then inspect page cache via vmtouch."""
+        """Drop caches, launch without drop-cache, then check vmtouch."""
+        # Drop system page cache first for a clean start
+        subprocess.run(["sh", "-c", "sync && echo 3 > /proc/sys/vm/drop_caches"])
+
         resp = requests.get(self.base_url + "/health", timeout=30)
         self.assertEqual(resp.status_code, 200)
 
