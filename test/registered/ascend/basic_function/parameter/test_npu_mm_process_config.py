@@ -1,4 +1,4 @@
-<![CDATA[import json
+import json
 import os
 import tempfile
 import unittest
@@ -50,7 +50,7 @@ _COMMON_ARGS = [
 
 
 class TestMmProcessConfigDpEncoder(CustomTestCase):
-    """--mm-process-config + --mm-enable-dp-encoder — verify video chat
+    """--mm-process-config + --mm-enable-dp-encoder -- verify video chat
     completion works with custom video processing and DP encoder.
 
     [Test Category] Parameter
@@ -138,4 +138,3 @@ class TestMmProcessConfigDpEncoder(CustomTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-]]>
