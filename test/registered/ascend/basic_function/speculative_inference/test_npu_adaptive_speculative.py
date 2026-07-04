@@ -116,14 +116,21 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
         # Create temp config.json with candidate_steps=[1, 3]
         # This constrains adaptive to only switch between 1 and 3,
         # making the upshift/downshift assertions deterministic.
+        #
+        # NPU B090 image requires batch-size keyed format:
+        #   {"<bs>": {"candidate_steps": [...], ...}}
+        # See error: "must contain at least one integer-string BS key,
+        #   e.g. {"1": {"candidate_steps": [1,3,7]}}"
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
             json.dump(
                 {
-                    "candidate_steps": [1, 3],
-                    "ema_alpha": 1.0,
-                    "warmup_batches": 1,
-                    "update_interval": 1,
-                    "up_hysteresis": 0.0,
+                    "1": {
+                        "candidate_steps": [1, 3],
+                        "ema_alpha": 1.0,
+                        "warmup_batches": 1,
+                        "update_interval": 1,
+                        "up_hysteresis": 0.0,
+                    }
                 },
                 f,
             )
