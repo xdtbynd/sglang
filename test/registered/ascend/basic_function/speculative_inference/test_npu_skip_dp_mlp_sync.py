@@ -2,14 +2,14 @@
 
 [Test Category] Speculative Decoding
 [Test Target] --speculative-skip-dp-mlp-sync;
---speculative-algorithm=EAGLE (positive) / DFLASH (negative);
+--speculative-algorithm=EAGLE (positive) / EAGLE3 (negative);
 --enable-dp-attention; --enable-dp-lm-head; --tp-size; --dp-size
 [Platform] NPU (Ascend A3, CANN 9.0.0)
 [Porting Source] New test case
 
 Test strategy:
   - Positive: EAGLE + skip-dp-mlp-sync -> server starts, GSM8K passes
-  - Negative: DFLASH + skip-dp-mlp-sync -> server crashes with Assert error,
+  - Negative: EAGLE3 + skip-dp-mlp-sync -> server crashes with Assert error,
     captured via subprocess.run, stderr asserted to contain expected message.
     This ensures CI does NOT fail when the assert is correctly triggered.
 """
@@ -24,9 +24,8 @@ import requests
 
 from sglang.srt.utils import kill_process_tree
 from sglang.test.ascend.test_ascend_utils import (
-    LLAMA_3_8B_EAGLE_WEIGHTS_PATH,
-    LLAMA_3_8B_INSTRUCT_WEIGHTS_PATH,
-    QWEN3_8B_DFLASH_B16_WEIGHTS_PATH,
+    QWEN3_8B_EAGLE3_WEIGHTS_PATH,
+    QWEN3_8B_WEIGHTS_PATH,
     logger,
 )
 from sglang.test.ci.ci_register import register_npu_ci
@@ -68,15 +67,15 @@ class TestNPUSkipDPMLPSyncPositive(CustomTestCase):
     performance by avoiding unnecessary cross-DP communication.
 
     Note: The assert in speculative_hook.py requires
-    speculative_algorithm == "EAGLE" (not EAGLE3). We use the genuine
-    EAGLE draft model (sglang-EAGLE-LLaMA3-Instruct-8B) paired with
-    Llama-3-8B-Instruct, which matches the EAGLE algorithm semantics.
+    speculative_algorithm == "EAGLE" (not EAGLE3). We use the EAGLE3 draft
+    model weights with --speculative-algorithm EAGLE, which the framework
+    accepts because EAGLE3 is a superset of EAGLE.
     """
 
     @classmethod
     def setUpClass(cls):
-        cls.model = LLAMA_3_8B_INSTRUCT_WEIGHTS_PATH
-        cls.draft_model = LLAMA_3_8B_EAGLE_WEIGHTS_PATH
+        cls.model = QWEN3_8B_WEIGHTS_PATH
+        cls.draft_model = QWEN3_8B_EAGLE3_WEIGHTS_PATH
         cls.base_url = DEFAULT_URL_FOR_TEST
 
         launch_args = [
@@ -168,7 +167,7 @@ class TestNPUSkipDPMLPSyncNegative(unittest.TestCase):
     """Negative test: non-EAGLE algorithm + skip-dp-mlp-sync should be rejected.
 
     --speculative-skip-dp-mlp-sync is only supported with EAGLE algorithm
-    (not EAGLE3, not DFLASH). When used with DFLASH, the server should
+    (not EAGLE3, not DFLASH). When used with EAGLE3, the server should
     assert and refuse to start.
 
     This test uses subprocess.run to capture the crash output and verify
@@ -177,12 +176,13 @@ class TestNPUSkipDPMLPSyncNegative(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = QWEN3_8B_DFLASH_B16_WEIGHTS_PATH
+        cls.model = QWEN3_8B_WEIGHTS_PATH
+        cls.draft_model = QWEN3_8B_EAGLE3_WEIGHTS_PATH
         cls.base_url = "http://127.0.0.1:39999"
 
     def test_non_eagle_algorithm_rejected(self):
-        """DFLASH + skip-dp-mlp-sync should trigger Assert and crash."""
-        logger.info("=== Negative test: DFLASH + skip-dp-mlp-sync ===")
+        """EAGLE3 + skip-dp-mlp-sync should trigger Assert and crash."""
+        logger.info("=== Negative test: EAGLE3 + skip-dp-mlp-sync ===")
         logger.info("Expecting server to crash with Assert error.")
 
         env = {**NPU_ENV, "ASCEND_RT_VISIBLE_DEVICES": "0,1"}
@@ -208,11 +208,15 @@ class TestNPUSkipDPMLPSyncNegative(unittest.TestCase):
             "--moe-dense-tp-size",
             "1",
             "--speculative-algorithm",
-            "DFLASH",
+            "EAGLE3",
             "--speculative-draft-model-path",
-            self.model,
-            "--speculative-dflash-block-size",
-            "16",
+            self.draft_model,
+            "--speculative-num-steps",
+            "2",
+            "--speculative-eagle-topk",
+            "1",
+            "--speculative-num-draft-tokens",
+            "3",
             "--speculative-skip-dp-mlp-sync",
             "--host",
             "127.0.0.1",
