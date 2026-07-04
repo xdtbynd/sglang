@@ -17,21 +17,23 @@ register_npu_ci(
 )
 
 # Environment variables for DSV4-Flash single-node PD-mix deployment.
-# Derived from run_dsv4_flash_hisi.sh (deployment script) plus MTP related
-# envs referenced from PR #882.
+# Derived from run_dsv4_flash.sh (latest deployment script from dev).
 DEEPSEEK_V4_FLASH_W8A8_16P_ENVS = {
     "PYTORCH_NPU_ALLOC_CONF": "expandable_segments:True",
     "STREAMS_PER_DEVICE": "32",
     "INF_NAN_MODE_FORCE_DISABLE": "1",
+    "SGLANG_SET_CPU_AFFINITY": "1",
+    "HCCL_SOCKET_IFNAME": "lo",
+    "GLOO_SOCKET_IFNAME": "lo",
+    "HCCL_OP_EXPANSION_MODE": "AIV",
     # deepep
     "HCCL_BUFFSIZE": "1000",
     "DEEP_NORMAL_MODE_USE_INT8_QUANT": "1",
-    "SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK": "64",
-    # dsv4
-    "IS_DEEPSEEK_V4": "1",
-    "USE_FUSED_HC_PRE_ASCENDC": "1",
-    "SGLANG_DSV4_NPU_FUSED_COMPRESSOR": "1",
+    "DEEPEP_NORMAL_LONG_SEQ_ROUND": "16",
+    "DEEPEP_NORMAL_LONG_SEQ_PER_ROUND_TOKENS": "2048",
+    "DEEPEP_NORMAL_COMBINE_ENABLE_LONG_SEQ": "1",
     # skip gpu branch
+    "SGLANG_OPT_FP8_WO_A_GEMM": "0",
     "SGLANG_OPT_USE_OVERLAP_STORE_CACHE": "False",
     "FORCE_DRAFT_MODEL_NON_QUANT": "1",
     "SGLANG_DSV4_FP4_EXPERTS": "False",
@@ -44,36 +46,33 @@ DEEPSEEK_V4_FLASH_W8A8_16P_ENVS = {
     # MTP (EAGLE) related envs
     "SGLANG_ENABLE_SPEC_V2": "1",
     "SGLANG_ENABLE_OVERLAP_PLAN_STREAM": "1",
-    # network
-    "HCCL_SOCKET_IFNAME": "lo",
-    "GLOO_SOCKET_IFNAME": "lo",
-    "HCCL_OP_EXPANSION_MODE": "AIV",
-    "SGLANG_SET_CPU_AFFINITY": "1",
 }
 
 # Server launch arguments for DSV4-Flash W8A8 single-node 16-card PD-mix.
-# Derived from run_dsv4_flash_hisi.sh and the test case design (Excel) which
-# requires max-running-requests=160 and MTP (EAGLE) enabled.
+# Derived from run_dsv4_flash.sh (latest deployment script from dev) and the
+# test case design (Excel) which requires max-running-requests=160 and MTP
+# (EAGLE) enabled.
 DEEPSEEK_V4_FLASH_W8A8_16P_OTHER_ARGS = [
     "--page-size",
     128,
     "--tp-size",
     16,
     "--trust-remote-code",
-    "--attention-backend",
-    "ascend",
     "--device",
     "npu",
+    "--attention-backend",
+    "dsv4",
     "--watchdog-timeout",
     9000,
     "--mem-fraction-static",
-    0.65,
+    0.85,
+    "--prefill-max-requests",
+    2,
     "--disable-radix-cache",
     "--chunked-prefill-size",
     -1,
     "--max-running-requests",
     160,
-    "--disable-overlap-schedule",
     "--dp-size",
     16,
     "--enable-dp-attention",
@@ -85,13 +84,13 @@ DEEPSEEK_V4_FLASH_W8A8_16P_OTHER_ARGS = [
     "modelslim",
     "--enable-dp-lm-head",
     "--kv-cache-dtype",
-    "auto",
-    "--skip-server-warmup",
+    "bfloat16",
     "--cuda-graph-bs",
     1,
     2,
-    3,
     4,
+    8,
+    10,
     # MTP (EAGLE) configuration, required by the test case design (Excel S2).
     "--speculative-algorithm",
     "EAGLE",
