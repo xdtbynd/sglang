@@ -91,6 +91,8 @@ class TestNPUSkipDPMLPSyncPositive(CustomTestCase):
             "3",
             "--speculative-draft-model-path",
             cls.draft_model,
+            "--speculative-attention-mode",
+            "decode",
             "--tp-size",
             "2",
             "--dp-size",
