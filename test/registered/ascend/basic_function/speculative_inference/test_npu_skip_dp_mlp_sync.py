@@ -24,9 +24,9 @@ import requests
 
 from sglang.srt.utils import kill_process_tree
 from sglang.test.ascend.test_ascend_utils import (
+    LLAMA_3_8B_EAGLE_WEIGHTS_PATH,
+    LLAMA_3_8B_INSTRUCT_WEIGHTS_PATH,
     QWEN3_8B_DFLASH_B16_WEIGHTS_PATH,
-    QWEN3_8B_EAGLE3_WEIGHTS_PATH,
-    QWEN3_8B_WEIGHTS_PATH,
     logger,
 )
 from sglang.test.ci.ci_register import register_npu_ci
@@ -68,15 +68,15 @@ class TestNPUSkipDPMLPSyncPositive(CustomTestCase):
     performance by avoiding unnecessary cross-DP communication.
 
     Note: The assert in speculative_hook.py requires
-    speculative_algorithm == "EAGLE" (not EAGLE3). We use the EAGLE3 draft
-    model weights with --speculative-algorithm EAGLE, which the framework
-    accepts because EAGLE3 is a superset of EAGLE.
+    speculative_algorithm == "EAGLE" (not EAGLE3). We use the genuine
+    EAGLE draft model (sglang-EAGLE-LLaMA3-Instruct-8B) paired with
+    Llama-3-8B-Instruct, which matches the EAGLE algorithm semantics.
     """
 
     @classmethod
     def setUpClass(cls):
-        cls.model = QWEN3_8B_WEIGHTS_PATH
-        cls.draft_model = QWEN3_8B_EAGLE3_WEIGHTS_PATH
+        cls.model = LLAMA_3_8B_INSTRUCT_WEIGHTS_PATH
+        cls.draft_model = LLAMA_3_8B_EAGLE_WEIGHTS_PATH
         cls.base_url = DEFAULT_URL_FOR_TEST
 
         launch_args = [
