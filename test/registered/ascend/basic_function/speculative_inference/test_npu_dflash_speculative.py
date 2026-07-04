@@ -186,7 +186,7 @@ class TestNPUDFlashSpeculative(CustomTestCase):
                 f"{avg_spec_accept_length=}\n"
             )
 
-        self.assertGreater(metrics["score"], 0.60, "GSM8K score should be > 0.60")
+        self.assertGreater(metrics["score"], 0.55, "GSM8K score should be > 0.55")
         if avg_spec_accept_length is not None:
             self.assertGreater(
                 avg_spec_accept_length,

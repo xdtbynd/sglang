@@ -10,9 +10,12 @@
 
 Porting notes:
   - attention-backend: triton -> ascend
-  - model: Qwen2.5-1.5B-Instruct -> Qwen3-8B (NPU CI pre-installed)
-  - mem-fraction-static: 0.85 -> 0.7 (NPU standard)
+  - model: DEFAULT_TARGET_MODEL_EAGLE -> Qwen3-8B (NPU CI pre-installed)
+  - draft model: DEFAULT_DRAFT_MODEL_EAGLE -> Qwen3-8B-EAGLE3
+  - algorithm: EAGLE -> EAGLE3 (NPU preferred)
+  - mem-fraction-static: 0.7 (unchanged)
   - GSM8K threshold: 0.20 -> 0.69 (stricter, consistent with NPU spec tests)
+  - GSM8K num_examples: 100 -> 200
   - Added NPU env vars (SGLANG_ENABLE_SPEC_V2, etc.)
   - register_cuda_ci -> register_npu_ci
   - print() -> logger.info()
@@ -21,14 +24,15 @@ Porting notes:
   - TestAdaptiveZeroStepBatchSizeServer NOT ported (depends on GPU routing logic)
 
 Key adaptation from GPU version:
-  The GPU test uses /set_args to manually drive upshift/downshift. The NPU
-  image does not have /set_args, so this test relies on the natural adaptive
-  behavior: --speculative-adaptive automatically adjusts speculative_num_steps
-  based on observed acceptance lengths. We verify the feature is enabled via
-  /server_info and that inference + GSM8K still works correctly.
+  Same as GPU: create temp config.json with candidate_steps=[1,3], use
+  /server_info internal_states to drive upshift/downshift with high/low
+  acceptance prompts. The /set_args endpoint is NOT used (GPU version
+  also does not use /set_args for adaptive; it uses natural prompts).
 """
 
+import json
 import os
+import tempfile
 import unittest
 from types import SimpleNamespace
 
@@ -42,7 +46,6 @@ from sglang.test.ascend.test_ascend_utils import (
 )
 from sglang.test.ci.ci_register import register_npu_ci
 from sglang.test.run_eval import run_eval
-from sglang.test.send_one import BenchArgs, send_one_prompt
 from sglang.test.test_utils import (
     DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
     DEFAULT_URL_FOR_TEST,
@@ -68,6 +71,22 @@ NPU_ENV = {
     "GLOO_SOCKET_IFNAME": "lo",
 }
 
+# High-acceptance prompt: easy to predict, high draft token acceptance
+HIGH_ACCEPT_PROMPT = (
+    "Output exactly 128 new lines. "
+    "Every line must be READY. "
+    "Do not add numbering, punctuation, or commentary."
+)
+
+# Low-acceptance prompt: creative, low draft token acceptance
+LOW_ACCEPT_PROMPT = (
+    "Compose a poem in the style of Emily Dickinson about quantum entanglement. "
+    "Make it emotionally resonant and at least 100 words."
+)
+
+MAX_UPSHIFT_ATTEMPTS = 4
+MAX_DOWNSHIFT_ATTEMPTS = 6
+
 
 class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
     """Test Adaptive Speculative Decoding on NPU.
@@ -75,140 +94,162 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
     Ported from GPU: sgl-project/sglang test/test_adaptive_speculative.py
     Class: TestAdaptiveSpeculativeServer
 
-    This test verifies that the adaptive speculative decoding system:
-    1. Starts with --speculative-adaptive enabled
-    2. /server_info reflects speculative_adaptive=True
-    3. Can handle inference requests without errors
-    4. Maintains GSM8K accuracy with adaptive enabled
+    This test verifies the adaptive speculative decoding system end-to-end:
+    1. Create a config.json with candidate_steps=[1, 3]
+    2. Start server with --speculative-adaptive --speculative-adaptive-config
+    3. Drive upshift: send high-acceptance prompts, verify num_steps -> 3
+    4. Drive downshift: send low-acceptance prompts, verify num_steps -> 1
+    5. Drive upshift again
+    6. Run GSM8K to verify accuracy is maintained
 
-    Note: Unlike the GPU version which uses /set_args to manually drive
-    upshift/downshift, this test relies on the natural adaptive behavior.
-    The /set_args endpoint is not available in the NPU CI image.
+    This is a faithful port of the GPU test, using the same config.json
+    approach and the same high/low acceptance prompts to drive the
+    adaptive logic naturally (no /set_args needed).
     """
+
+    model = QWEN3_8B_WEIGHTS_PATH
+    draft_model = QWEN3_8B_EAGLE3_WEIGHTS_PATH
+    base_url = DEFAULT_URL_FOR_TEST
 
     @classmethod
     def setUpClass(cls):
-        cls.model = QWEN3_8B_WEIGHTS_PATH
-        cls.draft_model = QWEN3_8B_EAGLE3_WEIGHTS_PATH
-        cls.base_url = DEFAULT_URL_FOR_TEST
+        # Create temp config.json with candidate_steps=[1, 3]
+        # This constrains adaptive to only switch between 1 and 3,
+        # making the upshift/downshift assertions deterministic.
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump(
+                {
+                    "candidate_steps": [1, 3],
+                    "ema_alpha": 1.0,
+                    "warmup_batches": 1,
+                    "update_interval": 1,
+                    "up_hysteresis": 0.0,
+                },
+                f,
+            )
+            cls.adaptive_config_path = f.name
 
-        launch_args = [
-            "--trust-remote-code",
-            "--attention-backend",
-            "ascend",
-            "--disable-cuda-graph",
-            "--mem-fraction-static",
-            "0.7",
-            "--tp-size",
-            "1",
-            "--sampling-backend",
-            "ascend",
-            "--speculative-algorithm",
-            "EAGLE3",
-            "--speculative-draft-model-path",
-            cls.draft_model,
-            "--speculative-num-steps",
-            "1",
-            "--speculative-eagle-topk",
-            "1",
-            "--speculative-num-draft-tokens",
-            "8",
-            "--speculative-adaptive",
-        ]
-
-        logger.info("Starting Adaptive Speculative server on NPU...")
+        logger.info("Created adaptive config at: %s", cls.adaptive_config_path)
         logger.info("Model: %s", cls.model)
         logger.info("Draft model: %s", cls.draft_model)
-        logger.info("speculative-adaptive=True, initial num_steps=1")
 
-        cls.process = popen_launch_server(
-            cls.model,
-            cls.base_url,
-            timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
-            other_args=launch_args,
-            env=NPU_ENV,
-        )
-        logger.info("Adaptive server started successfully.")
+        try:
+            cls.process = popen_launch_server(
+                cls.model,
+                cls.base_url,
+                timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
+                other_args=[
+                    "--trust-remote-code",
+                    "--attention-backend",
+                    "ascend",
+                    "--disable-cuda-graph",
+                    "--mem-fraction-static",
+                    "0.7",
+                    "--tp-size",
+                    "1",
+                    "--sampling-backend",
+                    "ascend",
+                    "--speculative-algorithm",
+                    "EAGLE3",
+                    "--speculative-draft-model-path",
+                    cls.draft_model,
+                    "--speculative-num-steps",
+                    "1",
+                    "--speculative-eagle-topk",
+                    "1",
+                    "--speculative-num-draft-tokens",
+                    "8",
+                    "--speculative-adaptive",
+                    "--speculative-adaptive-config",
+                    cls.adaptive_config_path,
+                ],
+                env=NPU_ENV,
+            )
+            logger.info("Adaptive server started successfully.")
+        except Exception:
+            os.unlink(cls.adaptive_config_path)
+            raise
 
     @classmethod
     def tearDownClass(cls):
-        kill_process_tree(cls.process.pid)
+        if hasattr(cls, "process"):
+            kill_process_tree(cls.process.pid)
+        if os.path.exists(cls.adaptive_config_path):
+            os.unlink(cls.adaptive_config_path)
 
-    def _get_server_info(self):
-        resp = requests.get(self.base_url + "/server_info", timeout=30)
-        self.assertEqual(resp.status_code, 200)
-        return resp.json()
+    def _get_internal_state(self) -> dict:
+        """Get internal state from /server_info.
 
-    def _send_one_prompt(self):
-        """Send one prompt via send_one_prompt with correct BenchArgs."""
-        from urllib.parse import urlparse
-
-        parsed = urlparse(self.base_url)
-        args = BenchArgs(host=parsed.hostname, port=parsed.port)
-        send_one_prompt(args, print_output=False)
-
-    def test_a_adaptive_enabled(self):
-        """Verify --speculative-adaptive is enabled in server info.
-
-        The adaptive feature may be silently disabled by the framework if
-        the server args are incompatible (e.g. dp_attention, topk>1). We
-        verify it is actually enabled.
+        Same as GPU version: internal_states[0] contains the adaptive state
+        including speculative_num_steps and avg_spec_accept_length.
         """
-        info = self._get_server_info()
-        adaptive_enabled = info.get("speculative_adaptive", False)
-        logger.info("speculative_adaptive in /server_info: %s", adaptive_enabled)
-        self.assertTrue(
-            adaptive_enabled,
-            "speculative_adaptive should be True in /server_info. "
-            "If False, the framework may have silently disabled it due to "
-            f"unsupported config. Full info keys: {list(info.keys())}",
+        response = requests.get(self.base_url + "/server_info", timeout=30)
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()["internal_states"][0]
+
+    def _generate(self, prompt: str, max_new_tokens: int = 64) -> dict:
+        response = requests.post(
+            self.base_url + "/generate",
+            json={
+                "text": prompt,
+                "sampling_params": {
+                    "temperature": 0,
+                    "max_new_tokens": max_new_tokens,
+                    "ignore_eos": True,
+                },
+            },
+            timeout=180,
         )
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
 
-        # Verify speculative_num_steps is present
-        num_steps = info.get("speculative_num_steps")
-        logger.info("Initial speculative_num_steps: %s", num_steps)
-        self.assertIsNotNone(num_steps, "speculative_num_steps should be present")
+    def _drive_upshift(self) -> dict:
+        """Send high-acceptance prompts until steps upshift to 3."""
+        state = self._get_internal_state()
+        for _ in range(MAX_UPSHIFT_ATTEMPTS):
+            self._generate(HIGH_ACCEPT_PROMPT)
+            state = self._get_internal_state()
+            if state["speculative_num_steps"] == 3:
+                return state
+        return state
 
-    def test_b_inference_triggers_adaptive(self):
-        """Send prompts to trigger natural adaptive behavior.
+    def _drive_downshift(self) -> dict:
+        """Send low-acceptance prompts until steps downshift to 1."""
+        state = self._get_internal_state()
+        for _ in range(MAX_DOWNSHIFT_ATTEMPTS):
+            self._generate(LOW_ACCEPT_PROMPT)
+            state = self._get_internal_state()
+            if state["speculative_num_steps"] == 1:
+                return state
+        return state
 
-        The adaptive algorithm monitors acceptance lengths and adjusts
-        speculative_num_steps automatically. We send a batch of prompts
-        to exercise the adaptive logic, then check that speculative_num_steps
-        is still valid (present and a positive integer).
+    def test_gsm8k_after_adaptive_switches(self):
+        """Exercise up/down/up adaptive switches, then verify GSM8K accuracy.
 
-        We do NOT assert a specific value because the natural adaptive
-        behavior depends on the model, the prompts, and the accept rate,
-        which are non-deterministic.
+        This is a faithful port of the GPU test:
+        1. Drive upshift: high-acceptance prompts -> num_steps should become 3
+        2. Drive downshift: low-acceptance prompts -> num_steps should become 1
+        3. Drive upshift again
+        4. Run GSM8K to verify accuracy
         """
-        logger.info("=== Sending prompts to trigger adaptive behavior ===")
-
-        # Send a batch of prompts to exercise the adaptive logic
-        for i in range(10):
-            self._send_one_prompt()
-            logger.info("Sent prompt %d/10", i + 1)
-
-        # Check that speculative_num_steps is still valid after inference
-        info = self._get_server_info()
-        num_steps = info.get("speculative_num_steps")
-        logger.info("speculative_num_steps after prompts: %s", num_steps)
-        self.assertIsNotNone(num_steps, "speculative_num_steps should be present")
-        self.assertIsInstance(
-            num_steps,
-            int,
-            f"speculative_num_steps should be int, got {type(num_steps)}",
+        logger.info("=== Driving upshift (high-acceptance prompts) ===")
+        state = self._drive_upshift()
+        self.assertEqual(
+            state["speculative_num_steps"], 3, f"Never upshifted: {state}"
         )
-        self.assertGreater(
-            num_steps, 0, f"speculative_num_steps should be > 0, got {num_steps}"
+        logger.info("Upshifted to num_steps=3: %s", state)
+
+        logger.info("=== Driving downshift (low-acceptance prompts) ===")
+        state = self._drive_downshift()
+        self.assertEqual(
+            state["speculative_num_steps"], 1, f"Never downshifted: {state}"
         )
+        logger.info("Downshifted to num_steps=1: %s", state)
 
-        # Verify adaptive is still enabled
-        adaptive_enabled = info.get("speculative_adaptive", False)
-        self.assertTrue(adaptive_enabled, "speculative_adaptive should still be True")
-        logger.info("Adaptive behavior exercised. speculative_num_steps=%s", num_steps)
+        logger.info("=== Driving upshift again ===")
+        self._drive_upshift()
 
-    def test_c_gsm8k(self):
-        """Verify GSM8K accuracy with adaptive speculative decoding enabled."""
+        logger.info("=== Running GSM8K ===")
         requests.get(self.base_url + "/flush_cache", timeout=30)
 
         args = SimpleNamespace(
@@ -235,6 +276,11 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
             0.69,
             "GSM8K score should be > 0.69 with adaptive speculative",
         )
+
+        # Verify avg_spec_accept_length is reported (like GPU version)
+        server_info = requests.get(self.base_url + "/server_info").json()
+        avg_accept_len = server_info["internal_states"][0]["avg_spec_accept_length"]
+        logger.info("avg_spec_accept_length=%.4f", avg_accept_len)
 
 
 if __name__ == "__main__":
