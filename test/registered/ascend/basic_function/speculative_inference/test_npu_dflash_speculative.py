@@ -138,6 +138,11 @@ class TestNPUDFlashSpeculative(CustomTestCase):
             "DFLASH",
             "speculative_algorithm should be DFLASH",
         )
+        self.assertEqual(
+            info.get("speculative_dflash_block_size"),
+            16,
+            "speculative_dflash_block_size should be 16",
+        )
 
     def test_b_basic_inference(self):
         """Verify basic inference works with DFLASH."""
