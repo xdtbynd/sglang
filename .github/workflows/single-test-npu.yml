@@ -1,5 +1,6 @@
 name: Single Test (NPU)
-# test round 1: <测试用例描述>
+# test round 1: DSV4-Flash W8A8 single-node PD-mix accuracy (AIME26 + GPQA-Diamond)
+#                and performance (in8k/out1k, TPOT<=50ms, throughput>=1708) cases.
 
 on:
   pull_request:
@@ -15,9 +16,9 @@ concurrency:
 jobs:
   single-node-poc:
     name: single-node-poc
-    runs-on: linux-aarch64-a3-2
+    runs-on: linux-aarch64-a3-16
     container:
-      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/dockerhub/lmsysorg/sglang:cann9.0.0-a3-20260622
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/dockerhub/lmsysorg/sglang:cann9.0.0-a3-B090
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,7 +28,7 @@ jobs:
           npu-smi info
 
       - name: Run test
-        timeout-minutes: 120
+        timeout-minutes: 240
         env:
           SGLANG_USE_MODELSCOPE: true
           HF_ENDPOINT: https://hf-mirror.com
@@ -38,9 +39,12 @@ jobs:
           echo "Source code path: ${sglang_source_path}"
           ln -sf ${sglang_source_path} /root/sglang
 
-          # Test cases - 使用时替换为实际的测试用例路径
+          # Test cases - DSV4-Flash W8A8 single-node 16-card PD-mix:
+          #   1. Accuracy on AIME26 + GPQA-Diamond
+          #   2. Performance in8k/out1k (TPOT<=50ms, throughput>=1708)
           test_cases=(
-            "test/registered/ascend/llm_models/test_npu_deepseek_v3_2_w8a8.py"
+            "test/registered/ascend/accuracy/deepseek_v4_flash/test_npu_deepseek_v4_flash_w8a8_16p_aime26_gpqa.py"
+            "test/registered/ascend/performance/deepseek_v4_flash/test_npu_deepseek_v4_flash_w8a8_16p_in8k_out1k_50ms.py"
           )
 
           for test_case in "${test_cases[@]}"; do

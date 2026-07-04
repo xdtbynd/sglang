@@ -1,0 +1,139 @@
+import unittest
+
+from sglang.test.ascend.e2e.test_npu_performance_utils import (
+    AISBENCHMARK_DATASET_DEFAULT,
+    BENCHMARK_TOOL_DEFAULT,
+    DEEPSEEK_V4_FLASH_W8A8_MTP_MODEL_PATH,
+    TestAscendPerformanceTestCaseBase,
+)
+from sglang.test.ci.ci_register import register_npu_ci
+
+register_npu_ci(
+    est_time=3600,
+    suite="",
+    nightly=True,
+    disabled="performance testcase",
+)
+
+# Environment variables for DSV4-Flash single-node PD-mix deployment.
+# Derived from run_dsv4_flash_hisi.sh (deployment script) plus MTP related
+# envs referenced from PR #882.
+DEEPSEEK_V4_FLASH_W8A8_16P_ENVS = {
+    "PYTORCH_NPU_ALLOC_CONF": "expandable_segments:True",
+    "STREAMS_PER_DEVICE": "32",
+    "INF_NAN_MODE_FORCE_DISABLE": "1",
+    # deepep
+    "HCCL_BUFFSIZE": "1000",
+    "DEEP_NORMAL_MODE_USE_INT8_QUANT": "1",
+    "SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK": "64",
+    # dsv4
+    "IS_DEEPSEEK_V4": "1",
+    "USE_FUSED_HC_PRE_ASCENDC": "1",
+    "SGLANG_DSV4_NPU_FUSED_COMPRESSOR": "1",
+    # skip gpu branch
+    "SGLANG_OPT_USE_OVERLAP_STORE_CACHE": "False",
+    "FORCE_DRAFT_MODEL_NON_QUANT": "1",
+    "SGLANG_DSV4_FP4_EXPERTS": "False",
+    "SGLANG_OPT_FUSE_WQA_WKV": "0",
+    "SGLANG_OPT_BF16_FP32_GEMM_ALGO": "torch",
+    "SGLANG_OPT_USE_FUSED_HASH_TOPK": "False",
+    "SGLANG_OPT_USE_TILELANG_MHC_PRE": "False",
+    "SGLANG_OPT_DEEPGEMM_HC_PRENORM": "False",
+    "SGLANG_OPT_USE_TILELANG_MHC_POST": "False",
+    # MTP (EAGLE) related envs
+    "SGLANG_ENABLE_SPEC_V2": "1",
+    "SGLANG_ENABLE_OVERLAP_PLAN_STREAM": "1",
+    # network
+    "HCCL_SOCKET_IFNAME": "lo",
+    "GLOO_SOCKET_IFNAME": "lo",
+    "HCCL_OP_EXPANSION_MODE": "AIV",
+    "SGLANG_SET_CPU_AFFINITY": "1",
+}
+
+# Server launch arguments for DSV4-Flash W8A8 single-node 16-card PD-mix.
+# Derived from run_dsv4_flash_hisi.sh and the test case design (Excel) which
+# requires max-running-requests=160 and MTP (EAGLE) enabled.
+DEEPSEEK_V4_FLASH_W8A8_16P_OTHER_ARGS = [
+    "--page-size",
+    128,
+    "--tp-size",
+    16,
+    "--trust-remote-code",
+    "--attention-backend",
+    "ascend",
+    "--device",
+    "npu",
+    "--watchdog-timeout",
+    9000,
+    "--mem-fraction-static",
+    0.65,
+    "--disable-radix-cache",
+    "--chunked-prefill-size",
+    -1,
+    "--max-running-requests",
+    160,
+    "--disable-overlap-schedule",
+    "--dp-size",
+    16,
+    "--enable-dp-attention",
+    "--moe-a2a-backend",
+    "deepep",
+    "--deepep-mode",
+    "auto",
+    "--quantization",
+    "compressed-tensors",
+    "--enable-dp-lm-head",
+    "--kv-cache-dtype",
+    "auto",
+    "--skip-server-warmup",
+    "--cuda-graph-bs",
+    1,
+    2,
+    3,
+    4,
+    # MTP (EAGLE) configuration, required by the test case design (Excel S2).
+    "--speculative-algorithm",
+    "EAGLE",
+    "--speculative-num-steps",
+    2,
+    "--speculative-eagle-topk",
+    1,
+    "--speculative-num-draft-tokens",
+    3,
+]
+
+
+class TestNPUDeepSeekV4FlashW8A816PIn8kOut1k50ms(TestAscendPerformanceTestCaseBase):
+    """Test NPU performance for DeepSeek-V4-Flash W8A8 16p PD-mix in8k out1k.
+
+    Single-node 16-card PD mixed deployment with TP=16, DP=16, EP=16 and MTP
+    (EAGLE) enabled. Random short-sequence benchmark from benchmark.sh:
+    input_len=8000, output_len=1000, num_prompts=160, max_concurrency=160.
+    Expected: TPOT <= 50ms and output token throughput >= 1708 tokens/s
+    (1.6x H20 baseline) on A3-560T.
+    """
+
+    benchmark_tool = BENCHMARK_TOOL_DEFAULT
+    dataset_type = AISBENCHMARK_DATASET_DEFAULT
+    model = DEEPSEEK_V4_FLASH_W8A8_MTP_MODEL_PATH
+    other_args = DEEPSEEK_V4_FLASH_W8A8_16P_OTHER_ARGS
+    envs = DEEPSEEK_V4_FLASH_W8A8_16P_ENVS
+    dataset_name = "random"
+    input_len = 8000
+    output_len = 1000
+    num_prompts = 160
+    max_concurrency = 160
+    random_range_ratio = 1
+    warmup_requests = 0
+    request_rate = float("inf")
+    seed = 1
+    tpot = 50
+    output_token_throughput = 1708
+
+    def test_npu_deepseek_v4_flash_w8a8_16p_in8k_out1k_50ms(self):
+        """Run NPU performance test for DeepSeek-V4-Flash W8A8 16p in8k out1k."""
+        self.run_throughput()
+
+
+if __name__ == "__main__":
+    unittest.main()
