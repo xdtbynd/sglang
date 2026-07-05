@@ -65,7 +65,7 @@ DEEPSEEK_V4_FLASH_W8A8_16P_OTHER_ARGS = [
     "--watchdog-timeout",
     9000,
     "--mem-fraction-static",
-    0.7,
+    0.75,
     "--prefill-max-requests",
     2,
     "--disable-radix-cache",
