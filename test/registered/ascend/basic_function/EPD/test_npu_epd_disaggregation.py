@@ -56,7 +56,12 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, PDDisaggregationServerBas
     encoder_transfer_backend = DEFAULT_NPU_ENCODER_TRANSFER_BACKEND
     tp_size = DEFAULT_NPU_TP_SIZE
     accuracy = 0.25
-    mmmu_args = ["--limit", "50", "--batch_size", "4"]
+    mmmu_args = [
+        "--limit", "200",
+        "--batch_size", "4",
+        "--gen_kwargs", "max_new_tokens=512",
+        "--system_instruction", "You are a helpful assistant. When answering multiple choice questions, first think through the problem step by step, then provide the final answer as a single letter (A, B, C, D, etc.).",
+    ]
 
     @classmethod
     def setUpClass(cls):
