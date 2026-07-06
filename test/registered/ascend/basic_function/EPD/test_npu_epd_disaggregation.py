@@ -56,7 +56,7 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, PDDisaggregationServerBas
     encoder_transfer_backend = DEFAULT_NPU_ENCODER_TRANSFER_BACKEND
     tp_size = DEFAULT_NPU_TP_SIZE
     accuracy = 0.25
-    mmmu_args = ["--limit", "50", "--batch_size", "4"]
+    mmmu_args = ["--limit", "50", "--batch_size", "2"]
 
     @classmethod
     def setUpClass(cls):
@@ -172,6 +172,10 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, PDDisaggregationServerBas
             "4",
             "--port",
             cls.prefill_port,
+            "--context-length",
+            "65536",
+            "--max-total-tokens",
+            "65536",
         ]
         prefill_args += cls.transfer_backend + cls.rdma_devices
         prefill_args += NPU_COMMON_ARGS
