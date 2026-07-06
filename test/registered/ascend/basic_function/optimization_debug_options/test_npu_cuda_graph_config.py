@@ -1,3 +1,4 @@
+import os
 import unittest
 
 import requests
@@ -15,15 +16,11 @@ from sglang.test.test_utils import (
 register_npu_ci(est_time=400, suite="full-1-npu-a3", nightly=True)
 
 
-class TestDisableCudaGraph(CustomTestCase):
-    """Testcase: verify --disable-prefill-cuda-graph, --disable-decode-cuda-graph,
-    --disable-piecewise-cuda-graph, --enable-dp-attention-local-control-broadcast
-    and --gc-threshold all take effect and inference succeeds
+class TestCudaGraphConfigOverride(CustomTestCase):
+    """Testcase: verify --cuda-graph-config JSON overrides per-phase convenience flags
 
     [Test Category] Parameter
-    [Test Target] --disable-prefill-cuda-graph; --disable-decode-cuda-graph;
-                  --disable-piecewise-cuda-graph;
-                  --enable-dp-attention-local-control-broadcast; --gc-threshold
+    [Test Target] --cuda-graph-config
     """
 
     model = LLAMA_3_2_1B_INSTRUCT_WEIGHTS_PATH
@@ -31,6 +28,8 @@ class TestDisableCudaGraph(CustomTestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.out_log_file = open("./cache_out_log.txt", "w+", encoding="utf-8")
+        cls.err_log_file = open("./cache_err_log.txt", "w+", encoding="utf-8")
         cls.process = popen_launch_server(
             cls.model,
             cls.base_url,
@@ -41,20 +40,24 @@ class TestDisableCudaGraph(CustomTestCase):
                 "0.8",
                 "--attention-backend",
                 "ascend",
-                "--disable-prefill-cuda-graph",
-                "--disable-decode-cuda-graph",
-                "--disable-piecewise-cuda-graph",
-                "--enable-dp-attention-local-control-broadcast",
-                "--gc-threshold",
-                "50",
+                "--disable-cuda-graph",
+                "--cuda-graph-backend-decode",
+                "disabled",
+                "--cuda-graph-config",
+                '{"decode":{"backend":"full"}}',
             ],
+            return_stdout_stderr=(cls.out_log_file, cls.err_log_file),
         )
 
     @classmethod
     def tearDownClass(cls):
         kill_process_tree(cls.process.pid)
+        cls.out_log_file.close()
+        cls.err_log_file.close()
+        os.remove("./cache_out_log.txt")
+        os.remove("./cache_err_log.txt")
 
-    def test_disable_cuda_graph(self):
+    def test_cuda_graph_config_override(self):
         response = requests.post(
             f"{DEFAULT_URL_FOR_TEST}/generate",
             json={
@@ -67,6 +70,15 @@ class TestDisableCudaGraph(CustomTestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("Paris", response.text)
+
+        self.err_log_file.seek(0)
+        err_log = self.err_log_file.read()
+        self.assertIn(
+            "cuda_graph_config",
+            err_log,
+            "Expected stderr to contain cuda_graph_config parse log, "
+            "proving JSON config was processed and overrode the disabled flag",
+        )
 
 
 if __name__ == "__main__":
