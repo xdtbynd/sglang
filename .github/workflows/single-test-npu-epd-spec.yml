@@ -6,6 +6,7 @@ name: Single Test (NPU) - EPD & Speculative
 #   - test_npu_epd_dynamic_register.py   (EPD: --encoder-bootstrap-port + --encoder-register-urls)
 # trigger: 2026-07-06 retry after network issue in run 28835466949
 # trigger: 2026-07-07 retry after checkout 504 in run 28836809306
+# trigger: 2026-07-07 rollback image to cann9.0.0-a3-B090 (run 28837751687 had cache_v view bug + aicore 507015)
 on:
   pull_request:
     branches:
@@ -20,7 +21,7 @@ jobs:
     name: single-node-poc
     runs-on: linux-aarch64-a3-4
     container:
-      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/dockerhub/lmsysorg/sglang:cann9.0.0-a3-B090-20260703
+      image: swr.cn-southwest-2.myhuaweicloud.com/base_image/dockerhub/lmsysorg/sglang:cann9.0.0-a3-B090
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
