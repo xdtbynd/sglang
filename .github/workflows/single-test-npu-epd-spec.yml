@@ -4,6 +4,7 @@ name: Single Test (NPU) - EPD & Speculative
 #   - test_npu_adaptive_speculative.py   (Adaptive: upshift/downshift + GSM8K, ported from GPU)
 #   - test_npu_skip_dp_mlp_sync.py       (skip-dp-mlp-sync: positive EAGLE + negative EAGLE3 Assert)
 #   - test_npu_epd_dynamic_register.py   (EPD: --encoder-bootstrap-port + --encoder-register-urls)
+# trigger: 2026-07-06 retry after network issue in run 28835466949
 on:
   pull_request:
     branches:
