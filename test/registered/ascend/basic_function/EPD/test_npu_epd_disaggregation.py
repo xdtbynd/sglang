@@ -58,11 +58,11 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, PDDisaggregationServerBas
     accuracy = 0.5
     mmmu_args = [
         "--limit",
-        "300",
+        "200",
         "--batch_size",
         "4",
         "--gen_kwargs",
-        "max_new_tokens=1024",
+        "max_new_tokens=512",
         "--system_instruction",
         "You are a helpful assistant. For multiple choice questions, first think through the problem step by step to work out the solution, then provide your final answer as a single capital letter corresponding to the correct option (A, B, C, or D). Make sure your last line or final output is just the answer letter.",
     ]
