@@ -77,6 +77,7 @@ class TestNpuPrefillDelayer(CustomTestCase):
         other_args = [
             "--attention-backend",
             "ascend",
+            "--enable-metrics",
             "--enable-prefill-delayer",
             "--prefill-delayer-queue-min-ratio",
             "0.8",
