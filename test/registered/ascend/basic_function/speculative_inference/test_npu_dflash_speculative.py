@@ -1,12 +1,10 @@
 """Test DFLASH speculative decoding on NPU.
 
 [Test Category] Speculative Decoding
-[Test Target] --speculative-algorithm=DFLASH;
---speculative-draft-model-path;
---speculative-dflash-block-size;
---speculative-draft-attention-backend
+[Test Target] --speculative-algorithm=DFLASH; --speculative-draft-model-path;
+--speculative-dflash-block-size; --speculative-draft-attention-backend
 [Platform] NPU (Ascend A3, CANN 9.0.0)
-[Porting Source] New test case (no GPU counterpart for DFLASH on NPU CI)
+[Porting Source] New test case
 """
 
 import os
@@ -52,15 +50,7 @@ NPU_ENV = {
 
 
 class TestNPUDFlashSpeculative(CustomTestCase):
-    """Test DFLASH speculative decoding on NPU in a single fused test.
-
-    DFLASH (Draft Flash) uses a block-structured draft model (b16, lossy).
-    This test verifies in one pass:
-    1. /server_info reflects DFLASH config (algorithm + block_size)
-    2. Basic inference produces output
-    3. GSM8K accuracy meets threshold (score > 0.55)
-    4. avg_spec_accept_length > 1.0 (speculation is beneficial)
-    """
+    """Verify DFLASH (b16 lossy draft) config, inference, GSM8K, and speedup."""
 
     @classmethod
     def setUpClass(cls):
@@ -115,25 +105,7 @@ class TestNPUDFlashSpeculative(CustomTestCase):
         kill_process_tree(cls.process.pid)
 
     def test_dflash_speculative(self):
-        """Verify DFLASH config, inference, GSM8K accuracy, and speculation benefit.
-
-        Single fused test covering all observation points:
-        - /server_info: algorithm=DFLASH, block_size=16
-        - Basic inference: non-empty response
-        - GSM8K: score > 0.55 (b16 lossy draft allows lower threshold than EAGLE3)
-        - avg_spec_accept_length > 1.0 (speculation provides speedup)
-
-        Threshold rationale:
-        - score > 0.55: DFLASH b16 is a lossy block-structured draft that trades
-          accuracy for faster drafting. Observed scores on NPU A3 range
-          [0.545, 0.7]. 0.55 is the lower bound of this range; scores below
-          indicate the draft model is degraded. The EAGLE3 threshold (0.69)
-          does not apply because DFLASH uses a different (b16) checkpoint.
-        - avg_spec_accept_length > 1.0: if <= 1.0, speculation provides no
-          benefit (every draft token rejected). This is queried from
-          /server_info after eval; if the server crashed (NPU aicore 507015),
-          the error surfaces directly rather than being silently skipped.
-        """
+        """Verify DFLASH config, inference, GSM8K score > 0.55, and accept_len > 1.0."""
         # 1. Verify /server_info config
         resp = requests.get(self.base_url + "/server_info", timeout=30)
         self.assertEqual(resp.status_code, 200)

@@ -1,20 +1,13 @@
 """Test EPD (Encoder Processing Disaggregation) dynamic registration on NPU.
 
-[Test Category] EPD (Encoder Processing Disaggregation)
+[Test Category] EPD
 [Test Target] --encoder-bootstrap-port; --encoder-register-urls;
---language-only; --base-gpu-id; --tp-size
+--language-only; --encoder-only; --base-gpu-id; --tp-size
 [Platform] NPU (Ascend A3, CANN 9.0.0)
 [Porting Source] New test case
 
-This test verifies the new EPD dynamic registration mechanism in a single
-fused workflow:
-  1. Start language-only server with --encoder-bootstrap-port 8997
-  2. Start encoder-only server with --encoder-register-urls http://127.0.0.1:8997
-  3. Verify both servers healthy
-  4. Verify encoder registered (encoder /health + language /server_info)
-  5. Send VLM request, verify correct response (end-to-end registration proof)
-  6. Stop encoder, verify it goes offline (encoder /health fails)
-  7. Restart encoder, send VLM request to verify re-registration
+Fused workflow: start language-only + encoder-only servers, verify health,
+registration, end-to-end VLM request, encoder offline, and re-registration.
 """
 
 import os
@@ -47,14 +40,9 @@ NPU_ENV = {
     "GLOO_SOCKET_IFNAME": "lo",
 }
 
-# Bootstrap port for EncoderBootstrapServer
 ENCODER_BOOTSTRAP_PORT = 8997
-
-# Language-only server port
 LANGUAGE_SERVER_PORT = 30000
 LANGUAGE_SERVER_URL = f"http://127.0.0.1:{LANGUAGE_SERVER_PORT}"
-
-# Encoder-only server port
 ENCODER_SERVER_PORT = 30010
 ENCODER_SERVER_URL = f"http://127.0.0.1:{ENCODER_SERVER_PORT}"
 
@@ -66,7 +54,7 @@ TEST_IMAGE_BASE64 = (
 
 
 class TestNPUEPDDynamicRegister(CustomTestCase):
-    """Test EPD dynamic registration and runtime encoder up/down in one workflow."""
+    """Verify EPD dynamic registration and encoder lifecycle in one workflow."""
 
     @classmethod
     def setUpClass(cls):
@@ -198,15 +186,7 @@ class TestNPUEPDDynamicRegister(CustomTestCase):
         return content
 
     def test_epd_dynamic_register(self):
-        """Verify EPD dynamic registration lifecycle in a single workflow.
-
-        Fused test covering all observation points:
-        1. Both servers healthy (/health returns 200)
-        2. Encoder registered (encoder /health + language /server_info)
-        3. VLM request succeeds (end-to-end registration proof)
-        4. Encoder goes offline when stopped (/health fails)
-        5. Encoder re-registers after restart (VLM request succeeds again)
-        """
+        """Verify EPD lifecycle: health, registration, VLM, offline, re-register."""
         # 1. Verify both servers healthy
         self.assertTrue(
             self._wait_for_health(self.language_url),

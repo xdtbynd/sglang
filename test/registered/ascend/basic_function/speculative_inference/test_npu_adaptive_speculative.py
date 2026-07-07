@@ -5,29 +5,17 @@
 --speculative-adaptive-config; --speculative-num-steps (dynamic);
 --speculative-eagle-topk; --speculative-num-draft-tokens
 [Platform] NPU (Ascend A3, CANN 9.0.0)
-[Porting Source] Ported from GPU test: sgl-project/sglang test/test_adaptive_speculative.py
+[Porting Source] Ported from GPU: sgl-project/sglang test/test_adaptive_speculative.py
   Class: TestAdaptiveSpeculativeServer
 
 Porting notes:
   - attention-backend: triton -> ascend
-  - model: DEFAULT_TARGET_MODEL_EAGLE -> Qwen3-8B (NPU CI pre-installed)
+  - model: DEFAULT_TARGET_MODEL_EAGLE -> Qwen3-8B
   - draft model: DEFAULT_DRAFT_MODEL_EAGLE -> Qwen3-8B-EAGLE3
   - algorithm: EAGLE -> EAGLE3 (NPU preferred)
-  - mem-fraction-static: 0.7 (unchanged)
-  - GSM8K threshold: 0.20 -> 0.69 (stricter, consistent with NPU spec tests)
-  - GSM8K num_examples: 100 -> 200
-  - Added NPU env vars (SGLANG_ENABLE_SPEC_V2, etc.)
-  - register_cuda_ci -> register_npu_ci
-  - print() -> logger.info()
-  - Added --disable-cuda-graph (NPU doesn't support CUDA Graph)
-  - Added --sampling-backend ascend
+  - GSM8K threshold: 0.20 -> 0.69; num_examples: 100 -> 200
+  - Added NPU env vars, --disable-cuda-graph, --sampling-backend ascend
   - TestAdaptiveZeroStepBatchSizeServer NOT ported (depends on GPU routing logic)
-
-Key adaptation from GPU version:
-  Same as GPU: create temp config.json with candidate_steps=[1,3], use
-  /server_info internal_states to drive upshift/downshift with high/low
-  acceptance prompts. The /set_args endpoint is NOT used (GPU version
-  also does not use /set_args for adaptive; it uses natural prompts).
 """
 
 import json
@@ -89,23 +77,7 @@ MAX_DOWNSHIFT_ATTEMPTS = 6
 
 
 class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
-    """Test Adaptive Speculative Decoding on NPU.
-
-    Ported from GPU: sgl-project/sglang test/test_adaptive_speculative.py
-    Class: TestAdaptiveSpeculativeServer
-
-    This test verifies the adaptive speculative decoding system end-to-end:
-    1. Create a config.json with candidate_steps=[1, 3]
-    2. Start server with --speculative-adaptive --speculative-adaptive-config
-    3. Drive upshift: send high-acceptance prompts, verify num_steps -> 3
-    4. Drive downshift: send low-acceptance prompts, verify num_steps -> 1
-    5. Drive upshift again
-    6. Run GSM8K to verify accuracy is maintained
-
-    This is a faithful port of the GPU test, using the same config.json
-    approach and the same high/low acceptance prompts to drive the
-    adaptive logic naturally (no /set_args needed).
-    """
+    """Verify adaptive EAGLE3 upshift/downshift and GSM8K accuracy on NPU."""
 
     model = QWEN3_8B_WEIGHTS_PATH
     draft_model = QWEN3_8B_EAGLE3_WEIGHTS_PATH
@@ -231,19 +203,10 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
         return state
 
     def test_gsm8k_after_adaptive_switches(self):
-        """Exercise up/down/up adaptive switches, then verify GSM8K accuracy.
-
-        This is a faithful port of the GPU test:
-        1. Drive upshift: high-acceptance prompts -> num_steps should become 3
-        2. Drive downshift: low-acceptance prompts -> num_steps should become 1
-        3. Drive upshift again
-        4. Run GSM8K to verify accuracy
-        """
+        """Drive up/down/up adaptive switches, then verify GSM8K score > 0.69."""
         logger.info("=== Driving upshift (high-acceptance prompts) ===")
         state = self._drive_upshift()
-        self.assertEqual(
-            state["speculative_num_steps"], 3, f"Never upshifted: {state}"
-        )
+        self.assertEqual(state["speculative_num_steps"], 3, f"Never upshifted: {state}")
         logger.info("Upshifted to num_steps=3: %s", state)
 
         logger.info("=== Driving downshift (low-acceptance prompts) ===")
