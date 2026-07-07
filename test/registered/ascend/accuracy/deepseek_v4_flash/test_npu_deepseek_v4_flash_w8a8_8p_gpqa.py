@@ -17,10 +17,6 @@ register_npu_ci(
 )
 
 # Environment variables for DSV4-Flash single-node PD-mix deployment.
-# Derived from run_dsv4_flash.sh (latest deployment script from dev).
-# NOTE: A3 is 8 cards / 16 NPUs. Variables are named "8p" to reflect the
-# 8-card physical topology; the actual TP/DP values below remain 16 (one
-# per NPU) and are unchanged from the deployment script.
 DEEPSEEK_V4_FLASH_W8A8_8P_ENVS = {
     "PYTORCH_NPU_ALLOC_CONF": "expandable_segments:True",
     "STREAMS_PER_DEVICE": "32",
@@ -51,10 +47,7 @@ DEEPSEEK_V4_FLASH_W8A8_8P_ENVS = {
     "SGLANG_ENABLE_OVERLAP_PLAN_STREAM": "1",
 }
 
-# Server launch arguments for DSV4-Flash W8A8 single-node 8-card (16-NPU)
-# PD-mix. Derived from run_dsv4_flash.sh (latest deployment script from dev)
-# and the test case design (Excel) which requires max-running-requests=160
-# and MTP (EAGLE) enabled. TP/DP/EP values stay 16 (one per NPU).
+# Server launch arguments for DSV4-Flash W8A8 single-node 8p PD-mix.
 DEEPSEEK_V4_FLASH_W8A8_8P_OTHER_ARGS = [
     "--page-size",
     128,
@@ -94,7 +87,7 @@ DEEPSEEK_V4_FLASH_W8A8_8P_OTHER_ARGS = [
     4,
     8,
     10,
-    # MTP (EAGLE) configuration, required by the test case design (Excel S2).
+    # MTP (EAGLE) configuration.
     "--speculative-algorithm",
     "EAGLE",
     "--speculative-num-steps",
@@ -105,11 +98,8 @@ DEEPSEEK_V4_FLASH_W8A8_8P_OTHER_ARGS = [
     3,
 ]
 
-# Generation config for Non-Think mode.
-# Per official docs (ModelScope DeepSeek-V4-Flash / W8A8-MTP), Non-Think means
-# NOT passing any thinking parameter. sglang defaults SGLANG_DEFAULT_THINKING
-# to False, so omitting chat_template_kwargs.thinking is equivalent to
-# Non-Think. Official GPQA Diamond baseline: 71.2%.
+# Generation config for Non-Think mode (no thinking parameter).
+# Official GPQA Diamond baseline: 71.2%.
 DEEPSEEK_V4_FLASH_W8A8_GENERATION_CONFIG_NON_THINK = {
     "max_tokens": 125000,
     "top_p": 1,
@@ -117,10 +107,8 @@ DEEPSEEK_V4_FLASH_W8A8_GENERATION_CONFIG_NON_THINK = {
     "n": 1,
 }
 
-# Generation config for Think High mode.
-# Per official docs, High mode requires both thinking=true and
-# reasoning_effort=high in chat_template_kwargs. Official GPQA Diamond
-# baseline: 87.4%; W8A8 quantized measured range: 0.84-0.86.
+# Generation config for Think High mode (thinking=true, reasoning_effort=high).
+# Official GPQA Diamond baseline: 87.4%.
 DEEPSEEK_V4_FLASH_W8A8_GENERATION_CONFIG_HIGH = {
     "max_tokens": 125000,
     "top_p": 1,
@@ -133,13 +121,7 @@ DEEPSEEK_V4_FLASH_W8A8_GENERATION_CONFIG_HIGH = {
 
 
 class TestNPUDeepSeekV4FlashW8A88PGPQAHigh(TestAscendAccuracyTestCaseBase):
-    """Test NPU accuracy for DeepSeek-V4-Flash W8A8 8p on GPQA-Diamond.
-
-    Think High mode: thinking=true, reasoning_effort=high.
-    Baseline accuracy 0.85 (official 0.874, W8A8 measured 0.84-0.86).
-    Framework auto-applies 5-question tolerance (5/198 ~= 0.0253), so the
-    effective threshold is 0.85 - 0.0253 = 0.8247.
-    """
+    """Test NPU accuracy for DeepSeek-V4-Flash W8A8 8p GPQA High mode."""
 
     benchmark_tool = BENCHMARK_TOOL_DEFAULT
     model = DEEPSEEK_V4_FLASH_W8A8_MTP_MODEL_PATH
@@ -160,13 +142,7 @@ class TestNPUDeepSeekV4FlashW8A88PGPQAHigh(TestAscendAccuracyTestCaseBase):
 
 
 class TestNPUDeepSeekV4FlashW8A88PGPQANonThink(TestAscendAccuracyTestCaseBase):
-    """Test NPU accuracy for DeepSeek-V4-Flash W8A8 8p on GPQA-Diamond.
-
-    Non-Think mode: no thinking parameter (per official docs).
-    Baseline accuracy 0.71 (official 0.712, W8A8 measured 0.7121).
-    Framework auto-applies 5-question tolerance (5/198 ~= 0.0253), so the
-    effective threshold is 0.71 - 0.0253 = 0.6847.
-    """
+    """Test NPU accuracy for DeepSeek-V4-Flash W8A8 8p GPQA Non-Think mode."""
 
     benchmark_tool = BENCHMARK_TOOL_DEFAULT
     model = DEEPSEEK_V4_FLASH_W8A8_MTP_MODEL_PATH

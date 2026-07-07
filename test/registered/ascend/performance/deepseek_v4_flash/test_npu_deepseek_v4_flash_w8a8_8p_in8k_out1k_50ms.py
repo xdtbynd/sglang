@@ -16,10 +16,6 @@ register_npu_ci(
 )
 
 # Environment variables for DSV4-Flash single-node PD-mix deployment.
-# Derived from run_dsv4_flash.sh (latest deployment script from dev).
-# NOTE: A3 is 8 cards / 16 NPUs. Variables are named "8p" to reflect the
-# 8-card physical topology; the actual TP/DP values below remain 16 (one
-# per NPU) and are unchanged from the deployment script.
 DEEPSEEK_V4_FLASH_W8A8_8P_ENVS = {
     "PYTORCH_NPU_ALLOC_CONF": "expandable_segments:True",
     "STREAMS_PER_DEVICE": "32",
@@ -50,10 +46,7 @@ DEEPSEEK_V4_FLASH_W8A8_8P_ENVS = {
     "SGLANG_ENABLE_OVERLAP_PLAN_STREAM": "1",
 }
 
-# Server launch arguments for DSV4-Flash W8A8 single-node 8-card (16-NPU)
-# PD-mix. Derived from run_dsv4_flash.sh (latest deployment script from dev)
-# and the test case design (Excel) which requires max-running-requests=160
-# and MTP (EAGLE) enabled. TP/DP/EP values stay 16 (one per NPU).
+# Server launch arguments for DSV4-Flash W8A8 single-node 8p PD-mix.
 DEEPSEEK_V4_FLASH_W8A8_8P_OTHER_ARGS = [
     "--page-size",
     128,
@@ -93,7 +86,7 @@ DEEPSEEK_V4_FLASH_W8A8_8P_OTHER_ARGS = [
     4,
     8,
     10,
-    # MTP (EAGLE) configuration, required by the test case design (Excel S2).
+    # MTP (EAGLE) configuration.
     "--speculative-algorithm",
     "EAGLE",
     "--speculative-num-steps",
@@ -106,14 +99,7 @@ DEEPSEEK_V4_FLASH_W8A8_8P_OTHER_ARGS = [
 
 
 class TestNPUDeepSeekV4FlashW8A88PIn8kOut1k50ms(TestAscendPerformanceTestCaseBase):
-    """Test NPU performance for DeepSeek-V4-Flash W8A8 8p in8k out1k.
-
-    Single-node 8-card (16-NPU) PD mixed deployment with TP=16, DP=16, EP=16
-    and MTP (EAGLE) enabled. Random short-sequence benchmark from
-    benchmark.sh: input_len=8000, output_len=1000, num_prompts=160,
-    max_concurrency=160. Expected: TPOT <= 50ms and output token throughput
-    >= 1708 tokens/s (1.6x H20 baseline) on A3-560T.
-    """
+    """Test NPU performance for DeepSeek-V4-Flash W8A8 8p in8k out1k."""
 
     benchmark_tool = BENCHMARK_TOOL_DEFAULT
     dataset_type = AISBENCHMARK_DATASET_DEFAULT
