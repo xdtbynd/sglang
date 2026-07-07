@@ -55,12 +55,16 @@ class TestNpuEPDDisaggregationMultiEncoders(MMMUMixin, PDDisaggregationServerBas
     model = QWEN3_VL_4B_INSTRUCT_WEIGHTS_PATH
     encoder_transfer_backend = DEFAULT_NPU_ENCODER_TRANSFER_BACKEND
     tp_size = DEFAULT_NPU_TP_SIZE
-    accuracy = 0.40
+    accuracy = 0.5
     mmmu_args = [
-        "--limit", "200",
-        "--batch_size", "4",
-        "--gen_kwargs", "max_new_tokens=512",
-        "--system_instruction", "You are a helpful assistant. When answering multiple choice questions, first think through the problem step by step, then provide the final answer as a single letter (A, B, C, D, etc.).",
+        "--limit",
+        "300",
+        "--batch_size",
+        "4",
+        "--gen_kwargs",
+        "max_new_tokens=1024",
+        "--system_instruction",
+        "You are a helpful assistant. For multiple choice questions, first think through the problem step by step to work out the solution, then provide your final answer as a single capital letter corresponding to the correct option (A, B, C, or D). Make sure your last line or final output is just the answer letter.",
     ]
 
     @classmethod
