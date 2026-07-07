@@ -22,7 +22,7 @@ register_npu_ci(est_time=200, suite="full-2-npu-a3", nightly=True)
 
 class TestExpertsSharedOuterLora(CustomTestCase):
     """Testcase: Verify set --experts-shared-outer-loras parameter, Reasoning request succeeded,
-    relevant information is contained in the logs
+    relevant information is contained in the logs.
 
     [Test Category] Parameter
     [Test Target] --experts-shared-outer-loras

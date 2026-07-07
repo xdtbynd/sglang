@@ -20,7 +20,7 @@ register_npu_ci(est_time=200, suite="full-2-npu-a3", nightly=True)
 
 class TestEnableDeepepWaterFill(CustomTestCase):
     """Testcase: Verify set --enable-deepep-waterfill the inference accuracy of the model on the
-    GSM8K dataset is no less than 0.90,
+    GSM8K dataset is no less than 0.90, relevant information is contained in the logs.
 
     [Test Category] Parameters
     [Test Target] --enable-deepep-waterfill
