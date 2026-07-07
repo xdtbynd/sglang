@@ -45,7 +45,7 @@ jobs:
 
           # Test cases
           test_cases=(
-            "test/registered/ascend/basic_function/parameter/test_npu_mm_process_config.py"
+            "test/registered/ascend/basic_function/parameter/test_npu_prefill_delayer_max_delay.py"
           )
 
           for test_case in "${test_cases[@]}"; do
