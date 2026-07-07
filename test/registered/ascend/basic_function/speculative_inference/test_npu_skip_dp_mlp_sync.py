@@ -3,7 +3,7 @@
 [Test Category] Speculative Decoding
 [Test Target] --speculative-skip-dp-mlp-sync;
 --speculative-algorithm=EAGLE (positive) / EAGLE3 (negative);
---enable-dp-attention; --tp-size; --dp-size
+--enable-dp-attention; --enable-dp-lm-head; --tp-size; --dp-size
 [Platform] NPU (Ascend A3, CANN 9.0.0)
 [Porting Source] New test case
 
@@ -95,6 +95,7 @@ class TestNPUSkipDPMLPSyncPositive(CustomTestCase):
             "--dp-size",
             "2",
             "--enable-dp-attention",
+            "--enable-dp-lm-head",
             "--attention-backend",
             "ascend",
             "--sampling-backend",

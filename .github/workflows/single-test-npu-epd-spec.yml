@@ -7,6 +7,7 @@ name: Single Test (NPU) - EPD & Speculative
 # trigger: 2026-07-06 retry after network issue in run 28835466949
 # trigger: 2026-07-07 retry after checkout 504 in run 28836809306
 # trigger: 2026-07-07 rollback image to cann9.0.0-a3-B090 (run 28837751687 had cache_v view bug + aicore 507015)
+# trigger: 2026-07-07 isolate failing cases: skip_dp_mlp_sync (add back --enable-dp-lm-head) + dflash only
 on:
   pull_request:
     branches:
@@ -47,11 +48,13 @@ jobs:
           # Test cases - EPD + Speculative Decoding
           # Order: fast/stable first. DFLASH is moved to last because its
           # GSM8K eval (200 examples, 128 threads) is the longest running.
+          # EPD and Adaptive are commented out (already passing) to reduce
+          # runtime while debugging skip_dp_mlp_sync and dflash failures.
           test_cases=(
-            "test/registered/ascend/basic_function/EPD/test_npu_epd_dynamic_register.py"
             "test/registered/ascend/basic_function/speculative_inference/test_npu_skip_dp_mlp_sync.py"
-            "test/registered/ascend/basic_function/speculative_inference/test_npu_adaptive_speculative.py"
             "test/registered/ascend/basic_function/speculative_inference/test_npu_dflash_speculative.py"
+            # "test/registered/ascend/basic_function/EPD/test_npu_epd_dynamic_register.py"
+            # "test/registered/ascend/basic_function/speculative_inference/test_npu_adaptive_speculative.py"
           )
 
           for test_case in "${test_cases[@]}"; do
