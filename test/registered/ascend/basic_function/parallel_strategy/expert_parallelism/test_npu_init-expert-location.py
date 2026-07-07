@@ -14,7 +14,7 @@ with open("qwen3_30b_a3b_random_no_redundant.json", "r") as f:
     init_expert_location = f.read()
 
 class TestInitExpertLocationString(GSM8KAscendMixin, CustomTestCase):
-    """Testcase: Verify set --init-expert-location the inference accuracy of the  model on the
+    """Testcase: Verify set --init-expert-location the inference accuracy of the model on the
     GSM8K dataset is no less than 0.90.
 
     [Test Category] Parameters
