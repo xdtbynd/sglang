@@ -305,6 +305,9 @@ QWEN3_5_397B_W4A8_MODEL_PATH = os.path.join(
 QWEN3_5_397B_W8A8_MODEL_PATH = os.path.join(
     MODEL_WEIGHTS_DIR, "Eco-Tech/Qwen3.5-397B-A17B-w8a8-mtp"
 )
+QWEN3_5_35B_W8A8_MODEL_PATH = os.path.join(
+    MODEL_WEIGHTS_DIR, "Eco-Tech/Qwen3.5-35B-A3B-w8a8-mtp"
+)
 
 # Embedding model weights path
 BGE_LARGE_EN_V1_5_WEIGHTS_PATH = os.path.join(MODEL_WEIGHTS_DIR, "bge-large-en-v1.5")
@@ -374,6 +377,9 @@ INVOICE_WITH_BARCODE_LOGO_IMAGES_PATH = os.path.join(
 # Other
 DEEPSEEK_CODER_JSON_PATH = "/__w/sglang/sglang/test/registered/ascend/basic_function/parameter/deepseek_coder.json"
 FR_SPEC_TOKEN_MAP_PATH = "/root/.cache/sglang/FR-Spec/freq_32768.pt"
+HOT_MAP_PT = "/root/.cache/sglang/hot_map/expert_distribution_recorder.pt"
+HOT_MAP_JSON = "/root/.cache/sglang/hot_map/expert_distribution_recorder.json"
+HOT_MAP_STRING = "/root/.cache/sglang/hot_map/qwen3_30b_a3b_random_no_redundant.json"
 CONFIG_YAML_PATH = (
     "/__w/sglang/sglang/test/registered/ascend/basic_function/config/config.yaml"
 )
