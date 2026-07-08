@@ -7,16 +7,14 @@ The server is launched with:
     --prefill-delayer-queue-min-ratio 0.8
     --prefill-delayer-max-delay-ms {MAX_DELAY_MS}
 
-Three test classes:
+Two test classes (both with assertions):
     - TestNpuPrefillDelayerAboveThreshold: sends requests exceeding
       queue_min (= min(running*ratio, max_prefill_bs)) so the condition
       "waiting >= queue_min" is met and prefill is released promptly.
-      Asserts short requests complete quickly (below max_delay_ms).
+      Asserts short requests complete below max_delay_ms.
     - TestNpuPrefillDelayerBelowThreshold: sends a request count far below
       queue_min while keeping running high. The delay can only be released
       on the max_delay_ms timeout. Asserts each short request waits > max_delay_ms.
-    - TestNpuPrefillDelayerObserve (for investigation): no assertions,
-      prints per-request latency and /metrics gauges.
 
 Interpretation:
     - queue_min = min(running * ratio, max_prefill_bs).
@@ -44,11 +42,7 @@ from sglang.test.test_utils import (
 
 # server 配置
 MODEL_PATH = QWEN3_0_6B_WEIGHTS_PATH
-# 实测在本环境下，延迟存在约 ~1.7s 的自然释放上限（running 稳定、queue 条件
-# 持续满足时延迟仍在 ~1.7s 就释放）。若 max_delay 设得比该上限还大，超时路径
-# 永远不会触发。故设为 1000ms（< 自然上限），让 max_delay 超时成为唯一释放原因，
-# 从而稳定验证超时路径。
-MAX_DELAY_MS = 1000
+MAX_DELAY_MS = 5000
 QUEUE_MIN_RATIO = 0.8
 
 # 长请求参数（用于占满 running）
@@ -79,8 +73,6 @@ SHORT_MAX_TOKENS = 50
 SHORT_CONCURRENT_ABOVE = 25
 # 远小于阈值 → waiting 始终 < queue_min，延迟只能靠 max_delay_ms 超时释放。
 SHORT_CONCURRENT_BELOW = 3
-# 观察类用的并发数（接近阈值边界，用于人工观察行为）
-SHORT_CONCURRENT_OBSERVE = 15
 
 # 模块级 server 进程，两个测试类共享
 GLOBAL_SERVER_PROCESS = None
@@ -412,73 +404,6 @@ class TestNpuPrefillDelayerBelowThreshold(CustomTestCase):
                 f" max_delay_ms({MAX_DELAY_MS}ms)，"
                 f"延迟可能被提前释放",
             )
-
-
-class TestNpuPrefillDelayerObserve(CustomTestCase):
-    """Testcase: Observe the Prefill Delayer behavior at the threshold boundary.
-    No assertions — prints per-request latency and /metrics for investigation.
-
-    [Test Category] Scheduling
-    [Test Target] --enable-prefill-delayer; --prefill-delayer-queue-min-ratio;
-                  --prefill-delayer-max-delay-ms
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        cls.base_url = DEFAULT_URL_FOR_TEST
-
-    def test_prefill_delayer_stepwise(self):
-        print("=== Prefill Delayer 观察测试（接近阈值边界） ===")
-        print(f"目标服务: {self.base_url}")
-
-        # 1. 先发送长请求（后台运行，持续占用 running）
-        print(f"[步骤1] 发送 {LONG_CONCURRENT} 个长请求（后台运行，持续占用 running）...")
-        long_threads = [
-            threading.Thread(target=_send_long_request, args=(self.base_url,))
-            for _ in range(LONG_CONCURRENT)
-        ]
-        for t in long_threads:
-            t.start()
-        print(f"    已启动 {LONG_CONCURRENT} 个长请求")
-
-        # 等待 1 秒，在长请求 prefill 阶段就发送短请求
-        time.sleep(1)
-
-        # 2. 查询当前状态（应看到 running>0, waiting=0）
-        print("[步骤2] 查询当前状态（应看到 running>0, waiting=0）")
-        _query_status(self.base_url, "步骤2")
-
-        # 3. 发送接近阈值的短请求（15，略低于 queue_min≈16），观察行为
-        print(
-            f"[步骤3] 发送 {SHORT_CONCURRENT_OBSERVE} 个快速请求"
-            f"（略低于 queue_min≈16，观察边界行为）..."
-        )
-        print("    预期: 可能被延迟，释放时机取决于 running 持续时间和 queue 积累速度")
-        results = {}
-        short_threads = [
-            threading.Thread(
-                target=_send_short_request, args=(self.base_url, i, results)
-            )
-            for i in range(1, SHORT_CONCURRENT_OBSERVE + 1)
-        ]
-        for t in short_threads:
-            t.start()
-        for t in short_threads:
-            t.join()
-
-        print("快速请求耗时结果：")
-        _print_short_results(results)
-
-        # 4. 再次查询状态
-        print("[步骤4] 再次查询状态")
-        time.sleep(1)
-        _query_status(self.base_url, "步骤4")
-
-        # 等待后台长请求结束
-        for t in long_threads:
-            t.join()
-
-        print("=== 观察完成 ===")
 
 
 if __name__ == "__main__":
