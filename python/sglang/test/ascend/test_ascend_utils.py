@@ -154,6 +154,9 @@ PERSIMMON_8B_CHAT_WEIGHTS_PATH = os.path.join(
 PHI_4_MULTIMODAL_INSTRUCT_WEIGHTS_PATH = os.path.join(
     MODEL_WEIGHTS_DIR, "microsoft/Phi-4-multimodal-instruct"
 )
+QWEN2_VL_2B_INSTRUCT_WEIGHTS_PATH = os.path.join(
+    MODEL_WEIGHTS_DIR, "Qwen/Qwen2-VL-2B-Instruct"
+)
 QWEN2_5_7B_INSTRUCT_WEIGHTS_PATH = os.path.join(
     MODEL_WEIGHTS_DIR, "Qwen/Qwen2.5-7B-Instruct"
 )
@@ -179,6 +182,15 @@ QWEN3_30B_A3B_INSTRUCT_2507_INT4_AUTOROUND_WEIGHTS_PATH = os.path.join(
 )
 QWEN3_30B_A3B_INSTRUCT_2507_WEIGHTS_PATH = os.path.join(
     MODEL_WEIGHTS_DIR, "Qwen/Qwen3-30B-A3B-Instruct-2507"
+)
+QWEN3_4B_WEIGHTS_PATH = os.path.join(
+    MODEL_WEIGHTS_DIR, "Qwen/Qwen3-4B"
+)
+QWEN3_4B_LORA_V2_WEIGHTS_PATH = os.path.join(
+    MODEL_WEIGHTS_DIR, "Qwen/Qwen3-4B-lora-v2"
+)
+QWEN3_4B_LORA_ZH_WEBNOVELTY_V0_0_WEIGHTS_PATH = os.path.join(
+    MODEL_WEIGHTS_DIR, "Qwen/Qwen3-4B-LoRA-ZH-WebNovelty-v0.0"
 )
 QWEN3_4B_GGUF_Q4_K_M_WEIGHTS_PATH = os.path.join(
     MODEL_WEIGHTS_DIR, "Qwen/Qwen3-4B-GGUF/Qwen3-4B-Q4_K_M.gguf"
