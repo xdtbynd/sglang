@@ -42,7 +42,11 @@ from sglang.test.test_utils import (
 
 # server 配置
 MODEL_PATH = QWEN3_0_6B_WEIGHTS_PATH
-MAX_DELAY_MS = 5000
+# 实测在本环境下，延迟存在约 ~1.7s 的自然释放上限（running 稳定、queue 条件
+# 持续满足时延迟仍在 ~1.7s 就释放）。若 max_delay 设得比该上限还大，超时路径
+# 永远不会触发。故设为 1000ms（< 自然上限），让 max_delay 超时成为唯一释放原因，
+# 从而稳定验证超时路径。
+MAX_DELAY_MS = 1000
 QUEUE_MIN_RATIO = 0.8
 
 # 长请求参数（用于占满 running）
@@ -273,7 +277,8 @@ class TestNpuPrefillDelayer(CustomTestCase):
 class TestNpuPrefillDelayerBelowThreshold(CustomTestCase):
     """Testcase: When the waiting queue stays below the threshold and running is
     kept high for the whole delay window, prefill is released only on the
-    max_delay_ms timeout, so the short requests must wait longer than 5s.
+    max_delay_ms timeout, so the short requests must wait longer than
+    max_delay_ms.
 
     [Test Category] Scheduling
     [Test Target] --prefill-delayer-max-delay-ms
@@ -287,7 +292,7 @@ class TestNpuPrefillDelayerBelowThreshold(CustomTestCase):
         print("=== 低于阈值请求：应触发 max_delay 超时 ===")
         print(f"目标服务: {self.base_url}")
 
-        # 1. 发送长请求，用更大的 max_tokens 让 running 在 5s 窗口内维持高位
+        # 1. 发送长请求，用更大的 max_tokens 让 running 在整个延迟窗口内维持高位
         print(
             f"[步骤1] 发送 {LONG_CONCURRENT} 个长请求"
             f"（max_new_tokens={LONG_SUSTAINED_MAX_TOKENS}，维持 running）..."
@@ -319,7 +324,10 @@ class TestNpuPrefillDelayerBelowThreshold(CustomTestCase):
         # 3. 发送远小于阈值的短请求
         print(f"[步骤3] 发送 {SHORT_CONCURRENT_BELOW} 个快速请求（远小于 queue_min≈16）...")
         print(f"    预期: waiting({SHORT_CONCURRENT_BELOW}) 始终 < queue_min，")
-        print(f"          延迟只能靠 max_delay_ms={MAX_DELAY_MS} 超时释放 → 耗时 > 5s")
+        print(
+            f"          延迟只能靠 max_delay_ms={MAX_DELAY_MS} 超时释放"
+            f" → 耗时 > {MAX_DELAY_MS}ms"
+        )
         results = {}
         short_threads = [
             threading.Thread(
