@@ -146,23 +146,29 @@ def _query_status(base_url: str, tag: str, verbose: bool = True):
 def _wait_until_stable_running(
     base_url: str,
     expected_running: int,
+    tolerance: int = 2,
     stable_secs: float = 4.0,
     interval: float = 0.5,
     timeout: float = 40.0,
 ):
-    """轮询 /metrics，直到 running 连续 stable_secs 秒维持 >= expected_running。
+    """轮询 /metrics，直到 running 连续 stable_secs 秒维持 >= 目标水位。
 
-    仅凭单次 running>=expected 不够：metrics 计数早于实际 prefill/decode，
-    上一轮日志里 running 在长请求真正 prefill 前就已显示为 20。用"持续稳定"
-    来跨过长请求自身的 prefill/flush 延迟阶段，确保短请求发出时系统已进入
-    持续 decode，从而落在干净的延迟窗口。返回稳定时的 running，超时返回 None。
+    目标水位 = expected_running - tolerance，容忍个别长请求的偶发波动
+    （如提前结束/调度抖动），否则一旦 running 从 20 掉到 19 就永远达不到
+    "连续 4s == 20"而超时。
+
+    仅凭单次达标不够：metrics 计数早于实际 prefill/decode，running 在长请求
+    真正 prefill 前就已显示为高位。用"持续稳定"跨过长请求自身的 prefill/flush
+    延迟阶段，确保短请求发出时系统已进入持续 decode。返回稳定时的 running，
+    超时返回 None。
     """
+    target = max(1, expected_running - tolerance)
     deadline = time.perf_counter() + timeout
     stable_since = None
     while time.perf_counter() < deadline:
         running, _ = _query_status(base_url, "wait", verbose=False)
         now = time.perf_counter()
-        if running is not None and running >= expected_running:
+        if running is not None and running >= target:
             if stable_since is None:
                 stable_since = now
             elif now - stable_since >= stable_secs:
@@ -183,6 +189,9 @@ def _send_long_request(base_url: str, max_tokens: int = LONG_MAX_TOKENS):
                     "max_new_tokens": max_tokens,
                     "temperature": 0.7,
                 },
+                # 必须跑满 max_tokens：否则长请求可能提前 EOS 结束，running
+                # 掉下来，_wait_until_stable_running 无法维持稳定而超时。
+                "ignore_eos": True,
             },
             timeout=180,
         )
