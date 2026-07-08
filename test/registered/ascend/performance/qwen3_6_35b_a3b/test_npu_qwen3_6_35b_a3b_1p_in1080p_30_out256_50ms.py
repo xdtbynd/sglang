@@ -100,6 +100,7 @@ class TestNPUQwen3_6_35BA3B_1P_In1080p_30_Out256_50ms(
     backend = "sglang-oai-chat"
     dataset_name = "image"
     max_concurrency = 50
+    warmup_requests = max_concurrency
     num_prompts = 200
     input_len = 30
     output_len = 256
