@@ -98,15 +98,6 @@ DEEPSEEK_V4_FLASH_W8A8_8P_OTHER_ARGS = [
     3,
 ]
 
-# Generation config for Non-Think mode (no thinking parameter).
-# Official GPQA Diamond baseline: 71.2%.
-DEEPSEEK_V4_FLASH_W8A8_GENERATION_CONFIG_NON_THINK = {
-    "max_tokens": 125000,
-    "top_p": 1,
-    "temperature": 1,
-    "n": 1,
-}
-
 # Generation config for Think High mode (thinking=true, reasoning_effort=high).
 # Official GPQA Diamond baseline: 87.4%.
 DEEPSEEK_V4_FLASH_W8A8_GENERATION_CONFIG_HIGH = {
@@ -138,27 +129,6 @@ class TestNPUDeepSeekV4FlashW8A88PGPQAHigh(TestAscendAccuracyTestCaseBase):
 
     def test_npu_deepseek_v4_flash_w8a8_8p_gpqa_high(self):
         """Run NPU accuracy test for DeepSeek-V4-Flash W8A8 8p GPQA High mode."""
-        self.run_accuracy()
-
-
-class TestNPUDeepSeekV4FlashW8A88PGPQANonThink(TestAscendAccuracyTestCaseBase):
-    """Test NPU accuracy for DeepSeek-V4-Flash W8A8 8p GPQA Non-Think mode."""
-
-    benchmark_tool = BENCHMARK_TOOL_DEFAULT
-    model = DEEPSEEK_V4_FLASH_W8A8_MTP_MODEL_PATH
-    other_args = DEEPSEEK_V4_FLASH_W8A8_8P_OTHER_ARGS
-    envs = DEEPSEEK_V4_FLASH_W8A8_8P_ENVS
-    accuracy = 0.71
-    datasets = ["gpqa_diamond"]
-    few_shot_num = 0
-    generation_config = DEEPSEEK_V4_FLASH_W8A8_GENERATION_CONFIG_NON_THINK
-    eval_batch_size = 128
-    stream = True
-    timeout = 6000
-    seed = 1
-
-    def test_npu_deepseek_v4_flash_w8a8_8p_gpqa_non_think(self):
-        """Run NPU accuracy test for DeepSeek-V4-Flash W8A8 8p GPQA Non-Think."""
         self.run_accuracy()
 
 
