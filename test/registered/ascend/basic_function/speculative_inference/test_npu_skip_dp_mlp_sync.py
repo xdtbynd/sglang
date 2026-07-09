@@ -114,8 +114,8 @@ class TestNPUSkipDPMLPSyncPositive(CustomTestCase):
             base_url=self.base_url,
             model=self.model,
             eval_name="gsm8k",
-            api="completion",
-            max_tokens=512,
+            api="chat",
+            max_tokens=2048,
             num_examples=200,
             num_threads=128,
         )
@@ -139,10 +139,9 @@ class TestNPUSkipDPMLPSyncPositive(CustomTestCase):
             )
 
         # Qwen3-8B official GSM8K (thinking mode) ~0.92; EAGLE is lossless
-        # speculation so score should match target. Threshold 0.80 leaves
-        # ~13% margin for NPU precision variance and 200-example sampling.
+        # speculation so score should match target.
         self.assertGreater(
-            metrics["score"], 0.80, "GSM8K score should be > 0.80 with skip-dp-mlp-sync"
+            metrics["score"], 0.92, "GSM8K score should be > 0.92 with skip-dp-mlp-sync"
         )
 
 

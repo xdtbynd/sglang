@@ -146,12 +146,18 @@ class TestNPUDFlashSpeculative(CustomTestCase):
         # 3. GSM8K accuracy
         requests.get(self.base_url + "/flush_cache", timeout=30)
 
+        # Use chat API + max_tokens=2048 to match PR #23122 settings.
+        # Qwen3-8B is a thinking model: it needs ~1000+ tokens for the
+        # thinking phase before emitting the final answer. With
+        # max_tokens=512 (completion API), thinking gets truncated and
+        # accuracy collapses to ~0.60. With chat API + 2048 tokens,
+        # accuracy matches the official PR ~0.85.
         eval_args = SimpleNamespace(
             base_url=self.base_url,
             model=self.model,
             eval_name="gsm8k",
-            api="completion",
-            max_tokens=512,
+            api="chat",
+            max_tokens=2048,
             num_examples=200,
             num_threads=128,
         )
@@ -174,7 +180,10 @@ class TestNPUDFlashSpeculative(CustomTestCase):
                 f"{avg_spec_accept_length=}\n"
             )
 
-        self.assertGreater(metrics["score"], 0.55, "GSM8K score should be > 0.55")
+        # PR #23122 reports DFLASH GSM8K score 0.846-0.863 with chat API +
+        # max_tokens=2048. Threshold 0.80 leaves margin for NPU precision
+        # variance and 200-example sampling.
+        self.assertGreater(metrics["score"], 0.80, "GSM8K score should be > 0.80")
         self.assertIsNotNone(
             avg_spec_accept_length,
             "avg_spec_accept_length should be available in /server_info",

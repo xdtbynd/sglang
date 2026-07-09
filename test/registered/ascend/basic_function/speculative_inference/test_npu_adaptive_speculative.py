@@ -13,9 +13,9 @@ Porting notes:
   - model: DEFAULT_TARGET_MODEL_EAGLE -> Qwen3-8B
   - draft model: DEFAULT_DRAFT_MODEL_EAGLE -> Qwen3-8B-EAGLE3
   - algorithm: EAGLE -> EAGLE3 (NPU preferred)
-  - GSM8K threshold: 0.20 -> 0.69; num_examples: 100 -> 200
+  - GSM8K threshold: 0.20 -> 0.80; num_examples: 100 -> 200
   - Added NPU env vars, --disable-cuda-graph, --sampling-backend ascend
-  - TestAdaptiveZeroStepBatchSizeServer NOT ported (depends on GPU routing logic)
+  - TestAdaptiveZeroStepBatchSizeServer ported as TestNPUAdaptiveZeroStepBatchSize
 """
 
 import json
@@ -226,8 +226,8 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
             base_url=self.base_url,
             model=self.model,
             eval_name="gsm8k",
-            api="completion",
-            max_tokens=512,
+            api="chat",
+            max_tokens=2048,
             num_examples=200,
             num_threads=128,
         )
@@ -240,17 +240,138 @@ class TestNPUAdaptiveSpeculativeServer(CustomTestCase):
                 f'{metrics["score"]=:.3f}\n'
             )
 
-        # NPU uses stricter threshold (0.69) than GPU (0.20)
+        # Qwen3-8B official GSM8K (thinking mode) ~0.92; EAGLE3 is lossless
+        # speculation so score should match target. Threshold 0.80 leaves
+        # ~13% margin for NPU precision variance and 200-example sampling.
         self.assertGreater(
             metrics["score"],
-            0.69,
-            "GSM8K score should be > 0.69 with adaptive speculative",
+            0.80,
+            "GSM8K score should be > 0.80 with adaptive speculative",
         )
 
         # Verify avg_spec_accept_length is reported (like GPU version)
         server_info = requests.get(self.base_url + "/server_info").json()
         avg_accept_len = server_info["internal_states"][0]["avg_spec_accept_length"]
         logger.info("avg_spec_accept_length=%.4f", avg_accept_len)
+
+
+class TestNPUAdaptiveZeroStepBatchSize(CustomTestCase):
+    """Verify adaptive steps=0 (nospec) fallback triggered by batch size on NPU.
+
+    Config routes BS>=8 -> steps=0 (drafting disabled) and BS<8 -> steps=3, so
+    the server cycles steps=3 -> steps=0 -> steps=3 as load rises and falls.
+    Ported from GPU: TestAdaptiveZeroStepBatchSizeServer.
+    """
+
+    model = QWEN3_8B_WEIGHTS_PATH
+    draft_model = QWEN3_8B_EAGLE3_WEIGHTS_PATH
+    base_url = DEFAULT_URL_FOR_TEST
+
+    COUNT_PROMPT = "Count from 1 to 400, separated by commas. Output only the numbers."
+
+    @classmethod
+    def setUpClass(cls):
+        # NPU B090 image requires batch-size keyed format.
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump(
+                {
+                    "1": {"candidate_steps": [3], "warmup_batches": 0},
+                    "8": {"candidate_steps": [0], "warmup_batches": 0},
+                },
+                f,
+            )
+            cls.adaptive_config_path = f.name
+
+        logger.info("BS-phase config: %s", cls.adaptive_config_path)
+
+        try:
+            cls.process = popen_launch_server(
+                cls.model,
+                cls.base_url,
+                timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
+                other_args=[
+                    "--trust-remote-code",
+                    "--attention-backend",
+                    "ascend",
+                    "--disable-cuda-graph",
+                    "--mem-fraction-static",
+                    "0.7",
+                    "--tp-size",
+                    "1",
+                    "--sampling-backend",
+                    "ascend",
+                    "--speculative-algorithm",
+                    "EAGLE3",
+                    "--speculative-draft-model-path",
+                    cls.draft_model,
+                    "--speculative-num-steps",
+                    "3",
+                    "--speculative-eagle-topk",
+                    "1",
+                    "--speculative-num-draft-tokens",
+                    "4",
+                    "--speculative-adaptive",
+                    "--speculative-adaptive-config",
+                    cls.adaptive_config_path,
+                    "--max-running-requests",
+                    "32",
+                    "--skip-server-warmup",
+                ],
+                env=NPU_ENV,
+            )
+            logger.info("BS-phase adaptive server started successfully.")
+        except Exception:
+            os.unlink(cls.adaptive_config_path)
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "process"):
+            kill_process_tree(cls.process.pid)
+        if os.path.exists(cls.adaptive_config_path):
+            os.unlink(cls.adaptive_config_path)
+
+    def _steps(self) -> int:
+        r = requests.get(self.base_url + "/server_info", timeout=30)
+        self.assertEqual(r.status_code, 200, r.text)
+        return r.json()["internal_states"][0]["speculative_num_steps"]
+
+    def test_batch_size_step_cycle(self):
+        """Server cycles steps=3 -> steps=0 -> steps=3 as load rises and falls."""
+        one = {"temperature": 0, "max_new_tokens": 64, "ignore_eos": True}
+
+        def generate_single() -> dict:
+            r = requests.post(
+                self.base_url + "/generate",
+                json={"text": self.COUNT_PROMPT, "sampling_params": one},
+                timeout=600,
+            )
+            self.assertEqual(r.status_code, 200, r.text)
+            return r.json()["meta_info"]
+
+        # Phase 1: BS=1 -> steps=3, drafting active.
+        m1 = generate_single()
+        self.assertEqual(self._steps(), 3, "expected steps=3 at BS=1")
+        self.assertGreater(
+            m1["spec_accept_rate"], 0.8, f"not drafting at steps=3: {m1}"
+        )
+
+        # Phase 2: BS=14 -> steps=0 (BS>=8 disables drafting).
+        full = {"temperature": 0, "max_new_tokens": 128, "ignore_eos": True}
+        r = requests.post(
+            self.base_url + "/generate",
+            json={"text": [self.COUNT_PROMPT] * 14, "sampling_params": [full] * 14},
+            timeout=600,
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(self._steps(), 0, "BS>=8 did not switch to steps=0")
+
+        # Phase 3: BS=1 -> steps=3 again, drafting restored.
+        m3 = generate_single()
+        self.assertEqual(self._steps(), 3, "did not reopen to steps=3")
+        self.assertGreater(
+            m3["spec_accept_rate"], 0.8, f"drafting not restored after steps=0: {m3}"
+        )
 
 
 if __name__ == "__main__":
