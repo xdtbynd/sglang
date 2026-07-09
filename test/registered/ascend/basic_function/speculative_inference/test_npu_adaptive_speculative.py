@@ -353,12 +353,13 @@ class TestNPUAdaptiveZeroStepBatchSize(CustomTestCase):
             return r.json()["meta_info"]
 
         # Phase 1: BS=1 -> steps=3, drafting active.
-        # Note: EAGLE3 on NPU has lower accept rate (~0.2-0.3) than EAGLE
-        # on GPU (>0.8). We only assert steps=3 here; the accept rate is
-        # not a reliable indicator on NPU.
+        # EAGLE3 on NPU achieves ~0.28 accept rate (vs EAGLE on GPU >0.8).
+        # Threshold 0.2 confirms drafting is active without being too strict.
         m1 = generate_single()
         self.assertEqual(self._steps(), 3, "expected steps=3 at BS=1")
-        logger.info("Phase 1: steps=3, accept_rate=%.3f", m1["spec_accept_rate"])
+        self.assertGreater(
+            m1["spec_accept_rate"], 0.2, f"not drafting at steps=3: {m1}"
+        )
 
         # Phase 2: BS=14 -> steps=0 (BS>=8 disables drafting).
         full = {"temperature": 0, "max_new_tokens": 128, "ignore_eos": True}
@@ -369,13 +370,12 @@ class TestNPUAdaptiveZeroStepBatchSize(CustomTestCase):
         )
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(self._steps(), 0, "BS>=8 did not switch to steps=0")
-        logger.info("Phase 2: steps=0 (nospec)")
 
         # Phase 3: BS=1 -> steps=3 again, drafting restored.
         m3 = generate_single()
         self.assertEqual(self._steps(), 3, "did not reopen to steps=3")
-        logger.info(
-            "Phase 3: steps=3 restored, accept_rate=%.3f", m3["spec_accept_rate"]
+        self.assertGreater(
+            m3["spec_accept_rate"], 0.2, f"drafting not restored after steps=0: {m3}"
         )
 
 
