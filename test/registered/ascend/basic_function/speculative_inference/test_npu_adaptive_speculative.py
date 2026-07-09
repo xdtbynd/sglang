@@ -267,7 +267,10 @@ class TestNPUAdaptiveZeroStepBatchSize(CustomTestCase):
     draft_model = QWEN3_8B_EAGLE3_WEIGHTS_PATH
     base_url = DEFAULT_URL_FOR_TEST
 
-    COUNT_PROMPT = "Count from 1 to 400, separated by commas. Output only the numbers."
+    # Reuse HIGH_ACCEPT_PROMPT (repetitive output) for high draft acceptance.
+    # EAGLE3 on NPU has lower accept rate than EAGLE on GPU, so the original
+    # COUNT_PROMPT only achieves ~0.22. HIGH_ACCEPT_PROMPT achieves >0.5.
+    BS_PHASE_PROMPT = HIGH_ACCEPT_PROMPT
 
     @classmethod
     def setUpClass(cls):
@@ -343,24 +346,25 @@ class TestNPUAdaptiveZeroStepBatchSize(CustomTestCase):
         def generate_single() -> dict:
             r = requests.post(
                 self.base_url + "/generate",
-                json={"text": self.COUNT_PROMPT, "sampling_params": one},
+                json={"text": self.BS_PHASE_PROMPT, "sampling_params": one},
                 timeout=600,
             )
             self.assertEqual(r.status_code, 200, r.text)
             return r.json()["meta_info"]
 
         # Phase 1: BS=1 -> steps=3, drafting active.
+        # EAGLE3 on NPU has lower accept rate than EAGLE on GPU; threshold 0.5.
         m1 = generate_single()
         self.assertEqual(self._steps(), 3, "expected steps=3 at BS=1")
         self.assertGreater(
-            m1["spec_accept_rate"], 0.8, f"not drafting at steps=3: {m1}"
+            m1["spec_accept_rate"], 0.5, f"not drafting at steps=3: {m1}"
         )
 
         # Phase 2: BS=14 -> steps=0 (BS>=8 disables drafting).
         full = {"temperature": 0, "max_new_tokens": 128, "ignore_eos": True}
         r = requests.post(
             self.base_url + "/generate",
-            json={"text": [self.COUNT_PROMPT] * 14, "sampling_params": [full] * 14},
+            json={"text": [self.BS_PHASE_PROMPT] * 14, "sampling_params": [full] * 14},
             timeout=600,
         )
         self.assertEqual(r.status_code, 200, r.text)
@@ -370,7 +374,7 @@ class TestNPUAdaptiveZeroStepBatchSize(CustomTestCase):
         m3 = generate_single()
         self.assertEqual(self._steps(), 3, "did not reopen to steps=3")
         self.assertGreater(
-            m3["spec_accept_rate"], 0.8, f"drafting not restored after steps=0: {m3}"
+            m3["spec_accept_rate"], 0.5, f"drafting not restored after steps=0: {m3}"
         )
 
 

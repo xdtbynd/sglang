@@ -46,11 +46,13 @@ jobs:
           # Order: fast/stable first. DFLASH is moved to last because its
           # GSM8K eval (200 examples, 128 threads, chat API + 2048 tokens)
           # is the longest running.
+          # EPD and skip_dp passed in run 28990842451; commented out to
+          # reduce runtime while fixing adaptive BS phase + dflash score.
           test_cases=(
-            "test/registered/ascend/basic_function/EPD/test_npu_epd_dynamic_register.py"
             "test/registered/ascend/basic_function/speculative_inference/test_npu_adaptive_speculative.py"
-            "test/registered/ascend/basic_function/speculative_inference/test_npu_skip_dp_mlp_sync.py"
             "test/registered/ascend/basic_function/speculative_inference/test_npu_dflash_speculative.py"
+            # "test/registered/ascend/basic_function/EPD/test_npu_epd_dynamic_register.py"
+            # "test/registered/ascend/basic_function/speculative_inference/test_npu_skip_dp_mlp_sync.py"
           )
 
           for test_case in "${test_cases[@]}"; do
