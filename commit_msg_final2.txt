@@ -1,9 +1,0 @@
-chore: remove yml, streamline comments, tighten skip_dp threshold
-
-- Remove .github/workflows/single-test-npu-epd-spec.yml (kept locally for
-  future debugging; not needed for PR merge)
-- Streamline module/class docstrings in skip_dp, dflash, adaptive, epd
-- Raise skip_dp GSM8K threshold 0.69 -> 0.80 (Qwen3-8B official thinking
-  mode GSM8K ~0.92; EAGLE is lossless speculation so score should match
-  target; 0.80 leaves ~13% margin for NPU precision variance)
-- All scripts pass ruff check + ruff format
