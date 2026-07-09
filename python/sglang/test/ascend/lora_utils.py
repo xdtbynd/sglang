@@ -60,14 +60,6 @@ LORA_MODELS_QWEN3 = [
     ),
 ]
 
-
-def ensure_reproducibility():
-    seed = 42
-    random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-
 TEST_MULTIPLE_BATCH_PROMPTS = [
     """
     ### Instruction:
