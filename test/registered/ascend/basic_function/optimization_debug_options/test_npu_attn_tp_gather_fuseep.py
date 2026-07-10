@@ -19,8 +19,6 @@ from sglang.test.test_utils import (
     popen_launch_server,
 )
 
-# Register with the maximum device count needed (dp<tp test needs 4).
-# Tests requiring fewer cards self-skip via _require_devices().
 register_npu_ci(est_time=600, suite="full-4-npu-a3", nightly=True)
 
 
@@ -61,8 +59,6 @@ class TestAttnTpGatherA2APath(CustomTestCase):
         "--attention-backend",
         "ascend",
         "--disable-cuda-graph",
-        # --moe-a2a-backend deepep triggers attention TP gather
-        # via the MOE a2a path, exercising the require_attn_tp_gather codepath.
         "--moe-a2a-backend",
         "deepep",
         "--tp-size",
