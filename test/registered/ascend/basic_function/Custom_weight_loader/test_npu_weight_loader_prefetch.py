@@ -16,7 +16,7 @@ from sglang.test.test_utils import (
     popen_launch_server,
 )
 
-register_npu_ci(est_time=300, suite="nightly-4-npu-a3", nightly=True)
+register_npu_ci(est_time=300, suite="full-4-npu-a3", nightly=True)
 
 # Common ascend launch args — --attention-backend ascend is a fixture
 _COMMON_ARGS = [
