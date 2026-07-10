@@ -49,8 +49,6 @@ class TestEnableQuantCommunications(CustomTestCase):
     @classmethod
     def tearDownClass(cls):
         kill_process_tree(cls.process.pid)
-        cls.out_log_file.close()
-        cls.err_log_file.close()
 
     def test_gsm8k(self):
         args = SimpleNamespace(
