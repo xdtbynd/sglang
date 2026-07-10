@@ -144,13 +144,6 @@ class TestNPUDFlashSpeculative(CustomTestCase):
         # 3. GSM8K accuracy
         requests.get(self.base_url + "/flush_cache", timeout=30)
 
-        # Use chat API + max_tokens=2048 to match PR #23122 settings.
-        # Qwen3-8B is a thinking model: it needs ~1000+ tokens for the
-        # thinking phase before emitting the final answer. With
-        # max_tokens=512 (completion API), thinking gets truncated and
-        # accuracy collapses to ~0.60. With chat API + 2048 tokens,
-        # accuracy matches the official PR ~0.85. Reduce threads to 64 to
-        # avoid connection errors under high concurrency on NPU.
         eval_args = SimpleNamespace(
             base_url=self.base_url,
             model=self.model,
