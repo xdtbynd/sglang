@@ -4,8 +4,6 @@
 [Test Target] --speculative-skip-dp-mlp-sync;
 --speculative-algorithm=EAGLE (positive) / EAGLE3 (negative);
 --tp-size; --dp-size
-[Platform] NPU (Ascend A3, CANN 9.0.0)
-[Porting Source] New test case
 """
 
 import os
