@@ -8,16 +8,6 @@
 [Porting Source] Ported from GPU: sgl-project/sglang test/test_adaptive_speculative.py
   Class: TestAdaptiveSpeculativeServer
 
-Porting notes:
-  - attention-backend: triton -> ascend
-  - model: DEFAULT_TARGET_MODEL_EAGLE -> Qwen3-8B
-  - draft model: DEFAULT_DRAFT_MODEL_EAGLE -> Qwen3-8B-EAGLE3
-  - algorithm: EAGLE -> EAGLE3 (NPU preferred)
-  - GSM8K threshold: 0.20 -> 0.80; num_examples: 100 -> 200
-  - Added NPU env vars, --disable-cuda-graph, --sampling-backend ascend
-  - TestAdaptiveZeroStepBatchSizeServer ported as TestNPUAdaptiveZeroStepBatchSize
-"""
-
 import json
 import os
 import tempfile
