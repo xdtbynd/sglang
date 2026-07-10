@@ -156,7 +156,7 @@ class TestNPUDFlashSpeculative(CustomTestCase):
         metrics = run_eval(eval_args)
         logger.info("GSM8K metrics: %s", metrics)
 
-        # 4. avg_spec_accept_length 
+        # 4. avg_spec_accept_length
         avg_spec_accept_length = None
         try:
             resp = requests.get(self.base_url + "/server_info", timeout=30)
@@ -167,7 +167,7 @@ class TestNPUDFlashSpeculative(CustomTestCase):
                 ) or internal_state.get("spec_accept_length")
         except Exception as e:
             logger.warning("Failed to query /server_info after GSM8K: %s", e)
-            
+        
         if is_in_ci():
             write_github_step_summary(
                 f"### test_dflash_speculative (DFLASH on NPU)\n"
