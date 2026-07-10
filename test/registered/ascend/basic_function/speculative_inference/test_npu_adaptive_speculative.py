@@ -7,6 +7,7 @@
 [Platform] NPU (Ascend A3, CANN 9.0.0)
 [Porting Source] Ported from GPU: sgl-project/sglang test/test_adaptive_speculative.py
   Class: TestAdaptiveSpeculativeServer
+"""
 
 import json
 import os
