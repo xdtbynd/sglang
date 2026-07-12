@@ -1,3 +1,4 @@
+      
 import unittest
 from types import SimpleNamespace
 
@@ -44,6 +45,8 @@ class TestEpDispatchAlgorithmDynamic(CustomTestCase):
                 "2",
                 "--expert-parallel-size",
                 "2",
+                "--ep-num-redundant-experts",
+                "4",
                 "--moe-a2a-backend",
                 "deepep",
                 "--deepep-mode",
@@ -99,6 +102,8 @@ class TestEpDispatchAlgorithmDynamicMtp(CustomTestCase):
                 "2",
                 "--expert-parallel-size",
                 "2",
+                "--ep-num-redundant-experts",
+                "4",
                 "--moe-a2a-backend",
                 "deepep",
                 "--deepep-mode",
@@ -143,3 +148,5 @@ class TestEpDispatchAlgorithmDynamicMtp(CustomTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    
