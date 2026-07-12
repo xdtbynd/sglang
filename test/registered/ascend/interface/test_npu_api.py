@@ -38,6 +38,8 @@ class Test01_NpuApi(CustomTestCase):
             "--attention-backend",
             "ascend",
             "--enable-return-hidden-states",
+            "--tp-size",
+            "2",
         ]
         cls.process = popen_launch_server(
             cls.model,
@@ -235,6 +237,8 @@ class TestChatCompletionsInterface(CustomTestCase):
             "--attention-backend",
             "ascend",
             "--enable-return-hidden-states",
+            "--tp-size",
+            "2",
         ]
         cls.process = popen_launch_server(
             cls.model,
@@ -477,6 +481,8 @@ class TestEnableThinking(CustomTestCase):
             "--attention-backend",
             "ascend",
             "--enable-return-hidden-states",
+            "--tp-size",
+            "2",
         ]
         cls.process = popen_launch_server(
             cls.model,
@@ -674,6 +680,8 @@ class TestStartProfile(CustomTestCase):
             "--attention-backend",
             "ascend",
             "--enable-torch-profiler",
+            "--tp-size",
+            "2",
         ]
         cls.process = popen_launch_server(
             cls.model,
