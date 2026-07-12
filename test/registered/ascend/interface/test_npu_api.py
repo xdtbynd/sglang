@@ -9,7 +9,7 @@ from transformers import AutoTokenizer
 
 from sglang.srt.environ import envs
 from sglang.srt.utils import kill_process_tree
-from sglang.test.ascend.test_ascend_utils import QWEN3_0_6B_WEIGHTS_PATH
+from sglang.test.ascend.test_ascend_utils import QWEN3_5_35B_A3B_WEIGHTS_PATH
 from sglang.test.ci.ci_register import register_npu_ci
 from sglang.test.test_utils import (
     DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
@@ -20,7 +20,7 @@ from sglang.test.test_utils import (
 
 OUTPUT_DIR = "./profiler_dir"
 
-register_npu_ci(est_time=1600, suite="full-1-npu-a3", nightly=True)
+register_npu_ci(est_time=1600, suite="full-2-npu-a3", nightly=True)
 
 
 class Test01_NpuApi(CustomTestCase):
@@ -32,7 +32,7 @@ class Test01_NpuApi(CustomTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = QWEN3_0_6B_WEIGHTS_PATH
+        cls.model = QWEN3_5_35B_A3B_WEIGHTS_PATH
         cls.base_url = DEFAULT_URL_FOR_TEST
         cls.other_args = [
             "--attention-backend",
@@ -229,7 +229,7 @@ class TestChatCompletionsInterface(CustomTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = QWEN3_0_6B_WEIGHTS_PATH
+        cls.model = QWEN3_5_35B_A3B_WEIGHTS_PATH
         cls.base_url = DEFAULT_URL_FOR_TEST
         cls.other_args = [
             "--attention-backend",
@@ -264,6 +264,7 @@ class TestChatCompletionsInterface(CustomTestCase):
             f"{self.base_url}/v1/chat/completions",
             json={
                 "messages": [{"role": "user", "content": "Hello"}],
+                "enable_thinking": True,
             },
         )
         self.assertEqual(response.status_code, 200, f"Failed with: {response.text}")
@@ -289,6 +290,7 @@ class TestChatCompletionsInterface(CustomTestCase):
                 "model": self.model,
                 "messages": [{"role": "user", "content": "Hello"}],
                 "stream": True,
+                "enable_thinking": True,
             },
         )
         self.assertEqual(response.status_code, 200, f"Failed with: {response.text}")
@@ -469,7 +471,7 @@ class TestEnableThinking(CustomTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.model = QWEN3_0_6B_WEIGHTS_PATH
+        cls.model = QWEN3_5_35B_A3B_WEIGHTS_PATH
         cls.base_url = DEFAULT_URL_FOR_TEST
         cls.other_args = [
             "--attention-backend",
@@ -666,7 +668,7 @@ class TestStartProfile(CustomTestCase):
     @classmethod
     def setUpClass(cls):
         envs.SGLANG_TORCH_PROFILER_DIR.set(OUTPUT_DIR)
-        cls.model = QWEN3_0_6B_WEIGHTS_PATH
+        cls.model = QWEN3_5_35B_A3B_WEIGHTS_PATH
         cls.base_url = DEFAULT_URL_FOR_TEST
         cls.other_args = [
             "--attention-backend",
