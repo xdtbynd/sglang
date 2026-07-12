@@ -1,4 +1,3 @@
-      
 import unittest
 from types import SimpleNamespace
 
@@ -148,5 +147,3 @@ class TestEpDispatchAlgorithmDynamicMtp(CustomTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-    
