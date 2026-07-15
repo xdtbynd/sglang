@@ -525,7 +525,7 @@ jobs:
 
       - name: Combine and generate report
         run: |
-          pip install coverage
+          python -c "import coverage" 2>/dev/null || pip install coverage
           coverage combine /root/.cache/coverage_data/${{ github.run_id }}-${{ github.run_attempt }}
           coverage report -m
           coverage html
