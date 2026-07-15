@@ -78,6 +78,7 @@ jobs:
           SGLANG_TEST_METRICS_OUTPUT: /root/.cache/tests/output/metrics/metrics
           PYTHONUNBUFFERED: "1"
           COVERAGE_FILE: ${{ inputs.coverage_run_id && format('/root/.cache/coverage_data/{0}/.coverage', inputs.coverage_run_id) || '' }}
+          COVERAGE_RCFILE: ${{ inputs.coverage_run_id && '/root/.cache/coverage_data/.coveragerc' || '' }}
           COVERAGE_PROCESS_START: ${{ inputs.coverage_run_id && '/root/.cache/coverage_data/.coveragerc' || '' }}
         shell: bash
         run: |
@@ -142,7 +143,6 @@ jobs:
             commit_id=${{ github.sha }}
             echo "commit id: ${commit_id}" > ${test_data_output_path}/commit_id
             export PYTHONPATH=${sglang_source_path}/python:$PYTHONPATH
-            coverage_source="${sglang_source_path}/python/sglang/srt/hardware_backend/npu"
           else
             echo "Use sglang from image: ${{ inputs.image }}"
             sglang_pkg_path=/sgl-workspace/sglang/python
@@ -150,7 +150,6 @@ jobs:
             mkdir -p ${ascend_test_util_path}
             mv ${ascend_test_util_path} ${ascend_test_util_path}_bak
             cp -r ${sglang_source_path}/python/sglang/test/ascend ${ascend_test_util_path}
-            coverage_source="/sgl-workspace/sglang/python/sglang/srt/hardware_backend/npu"
           fi
 
           source /usr/local/Ascend/cann/set_env.sh || true
@@ -165,7 +164,7 @@ jobs:
           echo "Running test case ${test_case}"
           test_exit_code=0
           if [ -n "${{ inputs.coverage_run_id }}" ]; then
-            coverage run --source=${coverage_source} ${test_case} 2>&1 | tee /tmp/test_output.log || test_exit_code=$?
+            coverage run ${test_case} 2>&1 | tee /tmp/test_output.log || test_exit_code=$?
           else
             ${PYTHON_FOR_SGLANG} -u ${test_case} 2>&1 | tee /tmp/test_output.log || test_exit_code=$?
           fi
