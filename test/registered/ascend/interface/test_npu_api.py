@@ -280,6 +280,7 @@ class TestChatCompletionsInterface(CustomTestCase):
         )
         self.assertEqual(response.status_code, 200, f"Failed with: {response.text}")
         self.assertEqual(response.json()["choices"][0]["finish_reason"], "length")
+        self.assertIsNotNone(data["choices"][0]["message"]["reasoning_content"])
 
     def test_stream(self):
         response = requests.post(
