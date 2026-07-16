@@ -264,6 +264,7 @@ class TestChatCompletionsInterface(CustomTestCase):
             f"{self.base_url}/v1/chat/completions",
             json={
                 "messages": [{"role": "user", "content": "Hello"}],
+                "enable_thinking": True,
             },
         )
         self.assertEqual(response.status_code, 200, f"Failed with: {response.text}")
@@ -289,6 +290,7 @@ class TestChatCompletionsInterface(CustomTestCase):
                 "model": self.model,
                 "messages": [{"role": "user", "content": "Hello"}],
                 "stream": True,
+                "enable_thinking": True,
             },
         )
         self.assertEqual(response.status_code, 200, f"Failed with: {response.text}")
