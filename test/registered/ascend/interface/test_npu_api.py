@@ -1,4 +1,3 @@
-import glob
 import json
 import logging
 import os
@@ -8,6 +7,7 @@ import unittest
 import requests
 from transformers import AutoTokenizer
 
+from sglang.srt.environ import envs
 from sglang.srt.utils import kill_process_tree
 from sglang.test.ascend.test_ascend_utils import LLAMA_3_2_1B_INSTRUCT_WEIGHTS_PATH
 from sglang.test.ci.ci_register import register_npu_ci
@@ -18,12 +18,7 @@ from sglang.test.test_utils import (
     popen_launch_server,
 )
 
-# Global variables: Manage server process and initialization status
-GLOBAL_SERVER_PROCESS = None
-GLOBAL_SERVER_INITIALIZED = False
 OUTPUT_DIR = "./profiler_dir"
-NPU_PROFILE_DIR = "/tmp"
-NPU_PROFILE_GLOB = "*ascend_pt"
 
 register_npu_ci(est_time=1600, suite="full-1-npu-a3", nightly=True)
 
@@ -37,29 +32,23 @@ class Test01_NpuApi(CustomTestCase):
 
     @classmethod
     def setUpClass(cls):
-        global GLOBAL_SERVER_PROCESS, GLOBAL_SERVER_INITIALIZED
-        # Start server only if not initialized
-        if not GLOBAL_SERVER_INITIALIZED:
-            cls.model = LLAMA_3_2_1B_INSTRUCT_WEIGHTS_PATH
-            other_args = [
-                "--attention-backend",
-                "ascend",
-                "--enable-return-hidden-states",
-            ]
-            # Start server and save to global variable
-            GLOBAL_SERVER_PROCESS = popen_launch_server(
-                cls.model,
-                DEFAULT_URL_FOR_TEST,
-                timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
-                other_args=other_args,
-            )
-            GLOBAL_SERVER_INITIALIZED = True
-            cls.base_url = DEFAULT_URL_FOR_TEST
+        cls.model = LLAMA_3_2_1B_INSTRUCT_WEIGHTS_PATH
+        cls.base_url = DEFAULT_URL_FOR_TEST
+        cls.other_args = [
+            "--attention-backend",
+            "ascend",
+            "--enable-return-hidden-states",
+        ]
+        cls.process = popen_launch_server(
+            cls.model,
+            cls.base_url,
+            timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
+            other_args=cls.other_args,
+        )
 
     @classmethod
     def tearDownClass(cls):
-        # First class does not terminate server
-        pass
+        kill_process_tree(cls.process.pid)
 
     def test_api_health(self):
         response = requests.get(f"{self.base_url}/health")
@@ -240,15 +229,24 @@ class TestChatCompletionsInterface(CustomTestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Skip initialization, directly reuse global server
         cls.model = LLAMA_3_2_1B_INSTRUCT_WEIGHTS_PATH
         cls.base_url = DEFAULT_URL_FOR_TEST
+        cls.other_args = [
+            "--attention-backend",
+            "ascend",
+            "--enable-return-hidden-states",
+        ]
+        cls.process = popen_launch_server(
+            cls.model,
+            cls.base_url,
+            timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
+            other_args=cls.other_args,
+        )
         cls.additional_chat_kwargs = {}
 
     @classmethod
     def tearDownClass(cls):
-        # Do not terminate server
-        pass
+        kill_process_tree(cls.process.pid)
 
     def test_model_and_messages(self):
         response = requests.post(
@@ -293,6 +291,7 @@ class TestChatCompletionsInterface(CustomTestCase):
             },
         )
         self.assertEqual(response.status_code, 200, f"Failed with: {response.text}")
+        has_reasoning = False
         has_content = False
 
         for line in response.iter_lines():
@@ -302,9 +301,14 @@ class TestChatCompletionsInterface(CustomTestCase):
                     data = json.loads(line[6:])
                     if "choices" in data and len(data["choices"]) > 0:
                         delta = data["choices"][0].get("delta", {})
+                        if "reasoning_content" in delta and delta["reasoning_content"]:
+                            has_reasoning = True
                         if "content" in delta and delta["content"]:
                             has_content = True
 
+        self.assertTrue(
+            has_reasoning, "Reasoning content not included in stream response"
+        )
         self.assertTrue(has_content, "Normal content not included in stream response")
 
     def test_temperature(self):
@@ -431,22 +435,16 @@ class TestChatCompletionsInterface(CustomTestCase):
         self.assertNotEqual(content1, content2)
 
     def test_stop_token_ids(self):
-        tokenizer = AutoTokenizer.from_pretrained(self.model)
-        # 不同模型的 EOS token id 不同：Llama-3 的 <|eot_id|>=128009，GPT 的 <|endoftext|>=13
-        stop_id = tokenizer.convert_tokens_to_ids("<|eot_id|>")
-        if stop_id == tokenizer.unk_token_id:
-            stop_id = tokenizer.eos_token_id
-
         response = requests.post(
             f"{self.base_url}/v1/chat/completions",
             json={
                 "model": self.model,
                 "messages": [{"role": "user", "content": "Hello"}],
-                "stop_token_ids": [1, stop_id],
+                "stop_token_ids": [1, 13],
             },
         )
         self.assertEqual(response.status_code, 200, f"Failed with: {response.text}")
-        self.assertEqual(response.json()["choices"][0]["matched_stop"], stop_id)
+        self.assertEqual(response.json()["choices"][0]["matched_stop"], 13)
 
     def test_rid(self):
         response = requests.post(
@@ -470,16 +468,25 @@ class TestEnableThinking(CustomTestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Skip initialization, directly reuse global server
         cls.model = LLAMA_3_2_1B_INSTRUCT_WEIGHTS_PATH
         cls.base_url = DEFAULT_URL_FOR_TEST
+        cls.other_args = [
+            "--attention-backend",
+            "ascend",
+            "--enable-return-hidden-states",
+        ]
+        cls.process = popen_launch_server(
+            cls.model,
+            cls.base_url,
+            timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
+            other_args=cls.other_args,
+        )
         cls.additional_chat_kwargs = {}
-        logging.basicConfig(level=logging.INFO)  # Initialize logging
+        logging.basicConfig(level=logging.INFO)
 
     @classmethod
     def tearDownClass(cls):
-        # Do not terminate server
-        pass
+        kill_process_tree(cls.process.pid)
 
     def test_model_parameters_model(self):
         response = requests.post(
@@ -657,18 +664,25 @@ class TestStartProfile(CustomTestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Skip initialization, reuse global server.
+        envs.SGLANG_TORCH_PROFILER_DIR.set(OUTPUT_DIR)
         cls.model = LLAMA_3_2_1B_INSTRUCT_WEIGHTS_PATH
         cls.base_url = DEFAULT_URL_FOR_TEST
+        cls.other_args = [
+            "--attention-backend",
+            "ascend",
+            "--enable-torch-profiler",
+        ]
+        cls.process = popen_launch_server(
+            cls.model,
+            cls.base_url,
+            timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
+            other_args=cls.other_args,
+        )
         cls.additional_chat_kwargs = {}
 
     @classmethod
     def tearDownClass(cls):
-        # Terminate server in last class
-        global GLOBAL_SERVER_PROCESS
-        if GLOBAL_SERVER_PROCESS:
-            kill_process_tree(GLOBAL_SERVER_PROCESS.pid)
-            GLOBAL_SERVER_PROCESS = None
+        kill_process_tree(cls.process.pid)
 
     def setUp(self):
         self._clear_profile_dir()
@@ -717,15 +731,10 @@ class TestStartProfile(CustomTestCase):
             shutil.rmtree(OUTPUT_DIR)
 
     def _check_non_empty_profile_dir(self):
-        candidates = glob.glob(os.path.join(NPU_PROFILE_DIR, NPU_PROFILE_GLOB))
-        self.assertTrue(
-            len(candidates) > 0,
-            f"No NPU profiler trace found in {NPU_PROFILE_DIR} matching {NPU_PROFILE_GLOB}",
+        self.assertTrue(os.path.isdir(OUTPUT_DIR), "Profiler directory does not exist")
+        self.assertNotEqual(
+            len(os.listdir(OUTPUT_DIR)), 0, "Profiler directory is empty"
         )
-        for d in candidates:
-            self.assertGreater(
-                len(os.listdir(d)), 0, f"Profiler directory {d} is empty"
-            )
 
     def _check_empty_profile_dir(self):
         if os.path.isdir(OUTPUT_DIR):
