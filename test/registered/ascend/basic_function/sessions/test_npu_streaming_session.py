@@ -35,11 +35,7 @@ class NPUStreamingSessionServerBase(StreamingSessionServerBase):
     npu_env = {
         **os.environ,
         "PYTORCH_NPU_ALLOC_CONF": "expandable_segments:True",
-        "ASCEND_MF_STORE_URL": "tcp://127.0.0.1:24666",
-        "HCCL_BUFFSIZE": "200",
         "HCCL_EXEC_TIMEOUT": "200",
-        "STREAMS_PER_DEVICE": "32",
-        "USE_VLLM_CUSTOM_ALLREDUCE": "1",
     }
 
     @classmethod
