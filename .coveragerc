@@ -5,6 +5,9 @@ relative_files = true
 concurrency = multiprocessing
 omit =
     */test/*
+    */torch/*
+    */torch_npu/*
+    */test/*
     */__pycache__/*
 
 [paths]
