@@ -85,6 +85,17 @@ class DisaggregationTestBase(PDDisaggregationServerBase):
             1,
         ] + cls.prefill_extra_args
         prefill_args += cls.transfer_backend + cls.rdma_devices
+        # NPU KV pools never build the CUDA-style k_data_ptrs/v_data_ptrs
+        # arrays; with the default "kernel" HiCache IO backend, decode-side
+        # retraction backup crashes the scheduler with AttributeError on
+        # NPUMHATokenToKVPool.k_data_ptrs. Pin the Ascend IO backend and its
+        # page-first-direct host layout.
+        prefill_args += [
+            "--hicache-io-backend",
+            "kernel_ascend",
+            "--hicache-mem-layout",
+            "page_first_direct",
+        ]
         cls.process_prefill = popen_launch_pd_server(
             cls.model,
             cls.prefill_url,
@@ -106,6 +117,14 @@ class DisaggregationTestBase(PDDisaggregationServerBase):
             1,
         ] + cls.decode_extra_args
         decode_args += cls.transfer_backend + cls.rdma_devices
+        # See start_prefill: retraction backup on NPU requires the Ascend IO
+        # backend; the default "kernel" backend crashes on NPUMHATokenToKVPool.
+        decode_args += [
+            "--hicache-io-backend",
+            "kernel_ascend",
+            "--hicache-mem-layout",
+            "page_first_direct",
+        ]
         cls.process_decode = popen_launch_pd_server(
             cls.model,
             cls.decode_url,
