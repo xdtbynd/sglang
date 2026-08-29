@@ -34,6 +34,10 @@ from sglang.test.test_utils import (
 
 register_npu_ci(est_time=400, suite="full-16-npu-a3", nightly=True)
 
+EAGLE3_LLAMA3_1_INSTRUCT_8B_WEIGHTS_PATH = "/home/weights/EAGLE3-LLaMA3.1-Instruct-8B/"
+LLAMA_3_1_8B_INSTRUCT_WEIGHTS_PATH = "/home/weights/Llama-3.1-8B-Instruct"
+LLAMA_3_2_1B_INSTRUCT_WEIGHTS_PATH = "/home/weights/Llama-3.2-1B-Instruct"
+
 
 class DisaggregationTestBase(PDDisaggregationServerBase):
     """
