@@ -269,13 +269,24 @@ class DSANPUIndexerMixin:
                 f"length: {indexer_cache_loc.shape[0]} != {positions.shape[0]}"
             )
         pool = get_token_to_kv_pool()
-        use_quant_indexer = pool.index_k_scale_buffer is not None
+        index_pool = getattr(pool, "full_kv_pool", pool)
+        index_layer_id = (
+            pool._transfer_full_attention_id(layer_id)
+            if index_pool is not pool
+            else layer_id
+        )
+        use_quant_indexer = (
+            getattr(index_pool, "index_k_scale_buffer", None) is not None
+        )
         if use_quant_indexer:
             k, k_scale = _quantize_npu_indexer_activation(
-                k, pool.indexer_hadamard_128, pool.dtype
+                k, index_pool.indexer_hadamard_128, index_pool.dtype
             )
-            pool.set_index_k_scale_buffer(layer_id, indexer_cache_loc, k_scale)
-        pool.set_index_k_buffer(layer_id, indexer_cache_loc, k)
+        index_pool.set_index_k_buffer(index_layer_id, indexer_cache_loc, k)
+        if use_quant_indexer:
+            index_pool.set_index_k_scale_buffer(
+                index_layer_id, indexer_cache_loc, k_scale
+            )
         if is_prefill:
             if (
                 self.dsa_enable_prefill_cp
@@ -337,7 +348,7 @@ class DSANPUIndexerMixin:
                     get_attn_backend().forward_metadata.actual_seq_lengths_q
                 )
 
-        past_key_states = get_token_to_kv_pool().get_index_k_buffer(layer_id)
+        past_key_states = index_pool.get_index_k_buffer(index_layer_id)
 
         if not self.skip_rope and self.rotary_emb.is_neox_style and self.alt_stream is not None:
             torch.npu.current_stream().wait_event(q_rope_event)
@@ -371,15 +382,17 @@ class DSANPUIndexerMixin:
             if use_quant_indexer:
                 query, query_scale = _quantize_npu_indexer_activation(
                     q.view(-1, self.n_heads, self.head_dim),
-                    pool.indexer_hadamard_128,
-                    pool.dtype,
+                    index_pool.indexer_hadamard_128,
+                    index_pool.dtype,
                 )
                 topk_indices = torch_npu.npu_quant_lightning_indexer(
                     query=query,
                     key=past_key_states,
                     weights=weights,
                     query_dequant_scale=query_scale,
-                    key_dequant_scale=pool.get_index_k_scale_buffer(layer_id),
+                    key_dequant_scale=index_pool.get_index_k_scale_buffer(
+                        index_layer_id
+                    ),
                     actual_seq_lengths_query=actual_seq_lengths_q.to(torch.int32),
                     actual_seq_lengths_key=actual_seq_lengths_kv.to(
                         device=k.device, dtype=torch.int32
