@@ -594,10 +594,25 @@ class NPUMLATokenToKVPool(MLATokenToKVPool):
         indexer_layer_ids: Optional[Sequence[int]] = None,
         kv_cache_dim: Optional[int] = None,
         is_draft_worker: bool = False,
+        index_kpool: int = 1,
+        index_kpool_compress: bool = False,
+        tail_extra_slots: int = 0,
+        max_running_requests: Optional[int] = None,
+        skip_topk_layers: Optional[Sequence[bool]] = None,
     ):
         # MLAPO historically owned NZ writes. Keep the allocation unchanged and
         # write into the NZ-addressed view below so ordinary MLA (including
         # Kimi-K3 MTP) can use FIA NZ without MLAPO.
+        if index_kpool != 1 or index_kpool_compress:
+            raise ValueError(
+                "NPUMLATokenToKVPool only supports an unpooled DSA index cache"
+            )
+        if indexer_layer_ids is None and skip_topk_layers is not None:
+            indexer_layer_ids = tuple(
+                layer_id
+                for layer_id, skip in enumerate(skip_topk_layers)
+                if not skip
+            )
         self.use_fia_nz = get_bool_env_var("SGLANG_USE_FIA_NZ")
         super(MLATokenToKVPool, self).__init__(
             size=size,
