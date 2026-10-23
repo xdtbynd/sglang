@@ -22,6 +22,35 @@ if is_npu():
 
 _use_ag_after_qlora = envs.SGLANG_USE_AG_AFTER_QLORA.get()
 
+# Temporary probe: identify which backend object get_attn_backend() resolves to
+# when its forward_metadata is missing. Remove with _idx_dbg_* once settled.
+_IDX_DBG_BUDGET = [6]
+
+
+def _idx_dbg_fm(obj) -> str:
+    if not hasattr(obj, "forward_metadata"):
+        return "n/a"
+    return "None" if obj.forward_metadata is None else "set"
+
+
+def _idx_dbg_backend(backend) -> str:
+    parts = [f"type={type(backend).__name__}"]
+    subs = getattr(backend, "attn_backends", None)
+    if subs is not None:
+        parts.append(f"n_sub={len(subs)}")
+        parts.append(
+            "subs=["
+            + ", ".join(
+                f"{i}:{type(s).__name__}:fm={_idx_dbg_fm(s)}" for i, s in enumerate(subs)
+            )
+            + "]"
+        )
+    for attr in ("linear_attn_backend", "dense_attn_backend", "inner_backend"):
+        sub = getattr(backend, attr, None)
+        if sub is not None:
+            parts.append(f"{attr}={type(sub).__name__}:fm={_idx_dbg_fm(sub)}")
+    return " ".join(parts)
+
 
 @lru_cache(maxsize=1)
 def _create_hadamard_128_cpu() -> torch.Tensor:
@@ -64,10 +93,23 @@ class DSANPUIndexerMixin:
         input_on_attn_tp_slices: bool = False,
         dynamic_scale: torch.Tensor = None,
     ) -> torch.Tensor:
-        if get_attn_backend().forward_metadata.seq_lens_cpu_int is None:
-            actual_seq_lengths_kv = get_attn_backend().forward_metadata.seq_lens
+        backend = get_attn_backend()
+        metadata = getattr(backend, "forward_metadata", None)
+        if _IDX_DBG_BUDGET[0] > 0:
+            _IDX_DBG_BUDGET[0] -= 1
+            print(
+                f"[IDX-DBG] mode={forward_batch.forward_mode} "
+                f"fm={'None' if metadata is None else 'set'} "
+                f"seq_lens={None if forward_batch.seq_lens is None else tuple(forward_batch.seq_lens.shape)} "
+                f"{_idx_dbg_backend(backend)}",
+                flush=True,
+            )
+        if metadata is None:
+            actual_seq_lengths_kv = forward_batch.seq_lens
+        elif metadata.seq_lens_cpu_int is None:
+            actual_seq_lengths_kv = metadata.seq_lens
         else:
-            actual_seq_lengths_kv = get_attn_backend().forward_metadata.seq_lens_cpu_int
+            actual_seq_lengths_kv = metadata.seq_lens_cpu_int
         is_prefill = (
             forward_batch.forward_mode.is_extend()
             and not forward_batch.forward_mode.is_draft_extend_v2()
@@ -76,7 +118,7 @@ class DSANPUIndexerMixin:
 
         bs = q_lora.shape[0]
 
-        if self.rotary_emb.is_neox_style:
+        if not self.skip_rope and self.rotary_emb.is_neox_style:
             if not hasattr(forward_batch, "npu_indexer_sin_cos_cache"):
                 cos_sin = self.rotary_emb.cos_sin_cache[positions]
                 cos, sin = cos_sin.chunk(2, dim=-1)
@@ -187,12 +229,13 @@ class DSANPUIndexerMixin:
 
             k_pe = k_pe.unsqueeze(1)
 
-            if layer_id == get_token_to_kv_pool().start_layer:
-                self.rotary_emb.sin_cos_cache = (
-                    self.rotary_emb.cos_sin_cache.index_select(0, positions)
-                )
+            if not self.skip_rope:
+                if layer_id == get_token_to_kv_pool().start_layer:
+                    self.rotary_emb.sin_cos_cache = (
+                        self.rotary_emb.cos_sin_cache.index_select(0, positions)
+                    )
 
-            q_pe, k_pe = self.rotary_emb(positions, q_pe, k_pe)
+                q_pe, k_pe = self.rotary_emb(positions, q_pe, k_pe)
             k_pe = k_pe.squeeze(1)
             q = torch.cat([q_pe, q_nope], dim=-1)
             k = torch.cat([k_pe, k_nope], dim=-1)
@@ -296,7 +339,7 @@ class DSANPUIndexerMixin:
 
         past_key_states = get_token_to_kv_pool().get_index_k_buffer(layer_id)
 
-        if self.rotary_emb.is_neox_style and self.alt_stream is not None:
+        if not self.skip_rope and self.rotary_emb.is_neox_style and self.alt_stream is not None:
             torch.npu.current_stream().wait_event(q_rope_event)
         if envs.SGLANG_NPU_USE_MULTI_STREAM.get():
             torch.npu.current_stream().wait_event(weights_event)

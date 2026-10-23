@@ -16,6 +16,19 @@ from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 _LOG2_E = math.log2(math.e)
 
 
+def _pack_kda_gate(gate: torch.Tensor, layer: RadixLinearAttention) -> torch.Tensor:
+    """Pack a KDA forget gate to the flat [.., num_heads * head_dim] layout.
+
+    The model hands over either the unpacked [.., num_heads, head_dim] form
+    (Kimi prefill) or an already packed [.., num_heads * head_dim] form
+    (GLM5-next, and every decode/verify path). Flattening the packed form would
+    merge the token axis into the head axis, so only flatten a single head.
+    """
+    if gate.shape[-1] == layer.head_k_dim:
+        gate = gate.flatten(-2)
+    return gate
+
+
 class _AscendKDAExtendKernel:
     """Ascend-only KDA prefill decomposition backed by sgl-kernel-npu."""
 
@@ -321,7 +334,7 @@ class AscendKDAAttnBackend(KDAAttnBackend):
     ]:
         """Activate raw gate and beta projections in FP32 for Ascend prefill."""
         preactivated_g = fused_kda_gate_npu(
-            g.flatten(-2),
+            _pack_kda_gate(g, layer),
             layer.A_log,
             layer.head_k_dim,
             gate_bias=layer.dt_bias,
@@ -411,7 +424,7 @@ class AscendKDAAttnBackend(KDAAttnBackend):
         # recurrent kernel to match the checkpoint's verify contract.
         # This stays in the Ascend backend so shared/GPU model code is unchanged.
         preactivated_a = fused_kda_gate_npu(
-            dense_a.flatten(-2),
+            _pack_kda_gate(dense_a, layer),
             layer.A_log,
             layer.head_k_dim,
             gate_bias=layer.dt_bias,

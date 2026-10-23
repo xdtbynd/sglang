@@ -34,7 +34,7 @@ from sglang.srt.environ import envs
 from sglang.srt.layers.quantization import QUANTIZATION_METHODS
 from sglang.srt.runtime_context import get_platform
 from sglang.srt.server_args import ServerArgs
-from sglang.srt.utils import is_hip, retry
+from sglang.srt.utils import is_hip, is_npu, retry
 from sglang.srt.utils.hf_transformers_utils import (
     get_config,
     get_context_length,
@@ -450,6 +450,17 @@ def get_dsa_index_n_heads(config: PretrainedConfig) -> int:
 
 
 def get_dsa_index_kpool(config: PretrainedConfig) -> int:
+    """Pooled index-key geometry, normalized to 1 on platforms without it.
+
+    ``IndexerKPool`` (the only consumer of a pooled geometry) implements CUDA
+    forwards exclusively, so NPU always runs the per-token ``Indexer``. The
+    normalization lives in this accessor rather than at the indexer-class
+    selection site because every other consumer -- page-size override, KV pool
+    layout, indexer metadata, scheduler truncation alignment -- has to agree on
+    the same value.
+    """
+    if is_npu():
+        return 1
     return getattr(config, "index_kpool", 1)
 
 

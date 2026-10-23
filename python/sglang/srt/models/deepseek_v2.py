@@ -2134,8 +2134,7 @@ class DeepseekV2AttentionMLA(
                     alt_stream=alt_stream,
                     config=config,
                 )
-                if indexer_cls is IndexerKPool:
-                    indexer_kwargs["skip_rope"] = skip_rope
+                indexer_kwargs["skip_rope"] = skip_rope
                 self.indexer = indexer_cls(**indexer_kwargs)
 
         self.kv_b_proj = ColumnParallelLinear(

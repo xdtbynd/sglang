@@ -1068,10 +1068,13 @@ class NPUMXFP8MoEMethod(_NPUMoEMethodBase):
     (weights already quantised); ``process_weights_after_loading`` tells the two
     apart by weight dtype.
 
-    gmm1 re-quantises its own output, so it is a single fused kernel rather than
-    a matmul plus a separate activation: the runner calls
-    ``apply_fused_gmm1_swiglu`` for w13 and ``apply`` only for w2 — hence the
-    per-prefix matmul chosen here.
+    gmm1 re-quantises its own output, so by default it is a single fused kernel
+    rather than a matmul plus a separate activation: the runner calls
+    ``apply_fused_gmm1_swiglu`` for w13 and ``apply`` for w2. The fused kernel
+    applies plain SiLU, so a checkpoint that clamps its activation
+    (``swiglu_limit``) instead runs w13 through ``apply`` — a plain grouped
+    matmul whose bf16 output the runner clamps and requantises via
+    ``NPUSwigluMxfp8Quant``.
 
     Where the *activation* quant happens depends on the dispatcher. On
     ``ascend_tp`` it comes for free from ``npu_moe_init_routing_v2(quant_mode=3)``,
@@ -1083,11 +1086,17 @@ class NPUMXFP8MoEMethod(_NPUMoEMethodBase):
     def __init__(self, weight_prefix: str):
         super().__init__(quant_config=None)
         if weight_prefix == "w13":
-            self.matmul = GroupedMatmulSwigluQuant()
+            self.fused_matmul = GroupedMatmulSwigluQuant()
+            # Plain grouped matmul for the unfused gmm1 fallback: a swiglu_limit
+            # checkpoint cannot use the fused kernel (it applies plain SiLU), so
+            # w13 runs this and emits bf16/fp16 for NPUSwigluMxfp8Quant to clamp
+            # and requantise.
+            self.matmul = GroupedMatmul()
             self.hidden_states_quantizer = HiddenStatesDynamicQuant(
                 quant_dtype=torch.float8_e4m3fn
             )
         else:
+            self.fused_matmul = None
             self.matmul = GroupedMatmul()
             self.hidden_states_quantizer = None
 
@@ -1192,7 +1201,7 @@ class NPUMXFP8MoEMethod(_NPUMoEMethodBase):
             hidden_states, pertoken_scale = self.hidden_states_quantizer(hidden_states)
 
         e8m0_dtype = _require_e8m0_dtype()
-        return self.matmul.forward(
+        return self.fused_matmul.forward(
             quant_info,
             "w13",
             hidden_states,
@@ -1222,17 +1231,33 @@ class NPUMXFP8MoEMethod(_NPUMoEMethodBase):
         weight_prefix: str,
         group_list_type,
     ) -> torch.Tensor:
-        if weight_prefix != "w2":
+        """Plain grouped matmul: always w2, and w13 for swiglu_limit checkpoints.
+
+        w2 runs this after the activation has produced the e4m3/e8m0 pair. w13
+        only reaches here when ``_uses_fused_gmm1`` returned False because the
+        checkpoint clamps its activation: the fused gmm1 applies plain SiLU, so
+        instead this emits a bf16/fp16 gate/up tensor that ``NPUSwigluMxfp8Quant``
+        then clamps and requantises.
+        """
+        if weight_prefix not in ("w13", "w2"):
             raise ValueError(
-                f"NPUMXFP8MoEMethod.apply only serves the w2 gmm, got "
-                f"'{weight_prefix}'. gmm1 fuses swiglu into a single op and must "
-                f"go through apply_fused_gmm1_swiglu, which returns a scale too."
+                f"NPUMXFP8MoEMethod.apply serves only the w13/w2 gmms, got "
+                f"'{weight_prefix}'."
             )
+        if weight_prefix == "w13" and pertoken_scale is None:
+            # DeepEP has no mxfp8 dispatch dtype and hands over bf16, so quantise
+            # here exactly like apply_fused_gmm1_swiglu does.
+            hidden_states, pertoken_scale = self.hidden_states_quantizer(hidden_states)
 
         e8m0_dtype = _require_e8m0_dtype()
         scale_args: Dict[str, Any] = {
             "scale": [getattr(quant_info, f"{weight_prefix}_weight_scale", None)],
-            "per_token_scale": [pertoken_scale],
+            # The activation scale reaches w2 either already pair-split (fused
+            # gmm1 / routing / npu_dynamic_mx_quant) or flat from
+            # NPUSwigluMxfp8Quant's swiglu_group_quant; _pair_pack_mxfp_act_scale
+            # leaves the former untouched and packs the latter, exactly as
+            # w4a8_mxfp_gmm does before the same op.
+            "per_token_scale": [_pair_pack_mxfp_act_scale(pertoken_scale)],
             "scale_dtype": e8m0_dtype,
             "per_token_scale_dtype": e8m0_dtype,
             "x_dtype": None,

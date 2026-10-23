@@ -350,8 +350,12 @@ def _prewarm_nccl() -> None:
     warmup_start = time.perf_counter()
     tp_group_handle = get_tp_group().device_group
 
-    # Single warmup all_reduce to initialize NCCL/RCCL/HCCL communicator
-    warmup_tensor = torch.zeros(1, device=torch.cuda.current_device())
+    # Single warmup all_reduce to initialize NCCL/RCCL/HCCL communicator.
+    # The tensor must live on the current platform's device: `torch.cuda` is
+    # only shimmed on some NPU builds, so calling into it here would fail with
+    # "Torch not compiled with CUDA enabled" when running on Ascend.
+    warmup_device = current_platform.get_device(get_device().gpu_id)
+    warmup_tensor = torch.zeros(1, device=warmup_device)
     dist.all_reduce(warmup_tensor, group=tp_group_handle)
     current_platform.synchronize()
 

@@ -284,12 +284,14 @@ class Indexer(DSANPUIndexerMixin, BaseFusedOp):
         quant_config: Optional[QuantizationConfig] = None,
         alt_stream: Optional[torch.cuda.Stream] = None,
         config=None,
+        skip_rope: bool = False,
     ):
         super().__init__()
         self.hidden_size = hidden_size
         self.n_heads = index_n_heads
         self.head_dim = index_head_dim
         self.rope_head_dim = rope_head_dim
+        self.skip_rope = skip_rope or rope_head_dim == 0
         self.index_topk = index_topk
         self.q_lora_rank = q_lora_rank
         self.layer_id = layer_id
